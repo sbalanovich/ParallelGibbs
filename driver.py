@@ -1,5 +1,6 @@
 import cPickle as pickle
 import lda
+import os
 from serial_lda_gibbs import LdaSampler
 import time
 
@@ -10,6 +11,8 @@ def main():
 
 
 def load_reuters_dataset():
+    if not os.path.exists(pickle_filepath):
+        dump_reuters_dataset()
     with open(pickle_filepath, 'r') as rfile:
         X, vocab, titles = pickle.load(rfile)
     return X, vocab, titles

@@ -52,8 +52,19 @@ class MulticoreLdaSampler(object):
         self.beta = beta
         self.P = P
 
+
+
     def _initialize(self, matrix):
+
+        # translation of AD-LDA paper notation to variable names
+        # W - vocab_size
+        # nk - nz
+        # nk|j = nmz[m,:]
+        # nx|k = nzw[:,w]
+
         n_docs, vocab_size = matrix.shape
+
+        self.docs_by_processor = np.array_split(np.arange(n_docs), self.P)
 
         # number of times document m and topic z co-occur
         self.nmz = np.zeros((n_docs, self.n_topics))
@@ -62,11 +73,6 @@ class MulticoreLdaSampler(object):
         self.nm = np.zeros(n_docs)
         self.nz = np.zeros(self.n_topics)
         self.topics = {}
-
-        self.local_nzw = [copy(self.nzw) for p in range(P)]
-        self.local_nm = [copy(self.nm) for p in range(P)]
-        self.local_nz = [copy(self.nz) for p in range(P)]
-
 
         for m in xrange(n_docs):
             # i is a number between 0 and doc_length-1
@@ -80,6 +86,25 @@ class MulticoreLdaSampler(object):
                 self.nz[z] += 1
                 self.topics[(m,i)] = z
 
+        self.local_nzw = [copy(self.nzw) for p in range(self.P)]
+        self.local_nz = [copy(self.nz) for p in range(self.P)]
+
+    def _global_update(self):
+
+        for i, w in enumerate(word_indices(matrix[m, :])):
+            update = sum([self.nzw[:,w] - self.local_nzw[p][:,w] for p in range(self.P)])
+            self.nzw[:,w] = self.nzw[:,w] + update
+
+            for z in range(n_topics):
+                self.nz = sum([self.local_nz[p][z] for p in range(P)])
+
+
+
+        self.local_nzw = [copy(self.nzw) for p in range(self.P)]
+        self.local_nz = [copy(self.nz) for p in range(self.P)]
+
+
+
     def _conditional_distribution(self, m, w):
         """
         Conditional distribution (vector of size n_topics).
@@ -88,7 +113,7 @@ class MulticoreLdaSampler(object):
         left = (self.nzw[:,w] + self.beta) / \
                (self.nz + self.beta * vocab_size)
         right = (self.nmz[m,:] + self.alpha) / \
-                (self.nm[m] + self.alpha * self.n_topics)
+                1 #(self.nm[m] + self.alpha * self.n_topics)
         p_z = left * right
         # normalize to obtain probabilities
         p_z /= np.sum(p_z)
@@ -146,8 +171,7 @@ class MulticoreLdaSampler(object):
                     self.nz[z] += 1
                     self.topics[(m,i)] = z
 
-            # FIXME: burn-in and lag!
-            yield 0#self.phi()
+            yield self.phi()
 
 if __name__ == "__main__":
     import os
