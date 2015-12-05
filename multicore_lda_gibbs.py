@@ -8,9 +8,9 @@ Latent Dirichlet Allocation, as described in
 Finding scientifc topics (Griffiths and Steyvers)
 """
 from copy import copy
+from functools import partial
 import numpy as np
-from multiprocessing.pool import ThreadPool as Pool
-# from multiprocessing import Pool
+from multiprocessing import Pool
 import scipy as sp
 from scipy.special import gammaln
 import time
@@ -69,6 +69,7 @@ class MulticoreLdaSampler(object):
         self.alpha = alpha
         self.beta = beta
         self.P = P
+        self.pool = Pool(processes=P)
 
 
 
@@ -90,7 +91,7 @@ class MulticoreLdaSampler(object):
         self.nzw = np.zeros((self.n_topics, vocab_size))
         self.nm = np.zeros(n_docs)
         self.nz = np.zeros(self.n_topics)
-        self.topics = {}
+        self.topics = np.zeros((n_docs, vocab_size))
 
         for m in xrange(n_docs):
             # i is a number between 0 and doc_length-1
@@ -102,7 +103,7 @@ class MulticoreLdaSampler(object):
                 self.nm[m] += 1
                 self.nzw[z,w] += 1
                 self.nz[z] += 1
-                self.topics[(m,i)] = z
+                self.topics[m,i] = z
 
         self.local_nzw = [copy(self.nzw) for p in range(self.P)]
         self.local_nz = [copy(self.nz) for p in range(self.P)]
@@ -121,21 +122,6 @@ class MulticoreLdaSampler(object):
         self.local_nzw = [copy(self.nzw) for p in range(self.P)]
         self.local_nz = [copy(self.nz) for p in range(self.P)]
 
-
-
-    def _conditional_distribution(self, m, w, p):
-        """
-        Conditional distribution (vector of size n_topics).
-        """
-        vocab_size = self.local_nzw[p].shape[1]
-        left = (self.local_nzw[p][:,w] + self.beta) / \
-               (self.local_nz[p] + self.beta * vocab_size)
-        right = (self.nmz[m,:] + self.alpha) / \
-                1 #(self.nm[m] + self.alpha * self.n_topics)
-        p_z = left * right
-        # normalize to obtain probabilities
-        p_z /= np.sum(p_z)
-        return p_z
 
     def loglikelihood(self):
         """
@@ -172,41 +158,63 @@ class MulticoreLdaSampler(object):
         self._initialize(matrix)
 
         for it in xrange(maxiter):
-            
-            def sample(p):
-                for m in self.docs_by_processor[p]:
-                    for i, w in enumerate(word_indices(matrix[m, :])):
-                        z = self.topics[(m,i)]
-                        self.nmz[m,z] -= 1
-                        self.nm[m] -= 1
-                        self.local_nzw[p][z,w] -= 1
-                        self.local_nz[p][z] -= 1
 
-                        p_z = self._conditional_distribution(m, w, p)
-                        if not np.isclose(np.sum(p_z), 1.):
-                            print p_z
-                        z = sample_index(p_z)
-
-                        self.nmz[m,z] += 1
-                        self.nm[m] += 1
-                        self.local_nzw[p][z,w] += 1
-                        self.local_nz[p][z] += 1
-                        self.topics[(m,i)] = z
-                return 1, 2
-            
             with Timer() as t:
-                pool = Pool(processes=self.P)
-                for p in range(self.P):
-                    pool.apply_async(sample, [p])
-                pool.close()
-                pool.join()
+                sample_for_p = partial(sample, self.topics, matrix, self.docs_by_processor,self.nmz, self.nm, self.local_nzw, self.local_nz, self.alpha, self.beta)
+                results = self.pool.map(sample_for_p, range(self.P))
+            
+                for p, (nz, nzw, nm, nmz, topics) in enumerate(results):
+                    indices = self.docs_by_processor[p]
+                    self.local_nz[p], self.local_nzw[p] = nz, nzw
+                    self.nm[indices] = nm
+                    self.nmz[indices] = nmz
+                    self.topics[indices] = topics
+
             print 'Sampled in %.3f seconds' % t.interval
 
             with Timer() as t:
                 self._global_update()
             print 'Updated in %.3f seconds' % t.interval
 
-            yield self.phi()
+            yield 1#self.phi()
+
+def conditional_distribution(m, w, p, nmz, local_nzw, local_nz, alpha, beta):
+    """
+    Conditional distribution (vector of size n_topics).
+    """
+    vocab_size = local_nzw[p].shape[1]
+    left = (local_nzw[p][:,w] + beta) / \
+           (local_nz[p] + beta * vocab_size)
+    right = (nmz[m,:] + alpha) / \
+            1 #(self.nm[m] + self.alpha * self.n_topics)
+    p_z = left * right
+    # normalize to obtain probabilities
+    p_z /= np.sum(p_z)
+    return p_z
+
+
+def sample(topics, matrix, docs_by_processor, nmz, nm, local_nzw, local_nz, alpha, beta, p):
+    for m in docs_by_processor[p]:
+        for i, w in enumerate(word_indices(matrix[m, :])):
+            z = topics[(m,i)]
+            nmz[m,z] -= 1
+            nm[m] -= 1
+            local_nzw[p][z,w] -= 1
+            local_nz[p][z] -= 1
+
+            p_z = conditional_distribution(m, w, p, nmz, local_nzw, local_nz, alpha, beta)
+            if not np.isclose(np.sum(p_z), 1.):
+                print p_z
+            z = sample_index(p_z)
+
+            nmz[m,z] += 1
+            nm[m] += 1
+            local_nzw[p][z,w] += 1
+            local_nz[p][z] += 1
+            topics[m,i] = z
+    
+    return local_nz[p], local_nzw[p], nm[docs_by_processor[p]], nmz[docs_by_processor[p]], topics[docs_by_processor[p]]
+
 
 if __name__ == "__main__":
     import os

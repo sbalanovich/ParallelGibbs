@@ -41,7 +41,7 @@ def multicore_gibbs(X, k, p):
     with Timer() as t:
         for it, phi in enumerate(sampler.run(X, maxiter=50)):
             print "Iteration", it
-            print "Likelihood", sampler.loglikelihood()
+            # print "Likelihood", sampler.loglikelihood()
 
     print 'Fit in %.3f seconds' % t.interval
 
@@ -60,7 +60,7 @@ class Timer:
 if __name__ == '__main__':
     X, vocab, titles = load_reuters_dataset()
     # baseline(X, 10)
-    multicore_gibbs(X, 10, 16)
+    multicore_gibbs(X, 10, 1)
 
 
     
