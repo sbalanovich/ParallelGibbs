@@ -10,7 +10,6 @@ Finding scientifc topics (Griffiths and Steyvers)
 from copy import copy
 import numpy as np
 from multiprocessing.pool import ThreadPool as Pool
-# from multiprocessing import Pool
 import scipy as sp
 from scipy.special import gammaln
 import time
