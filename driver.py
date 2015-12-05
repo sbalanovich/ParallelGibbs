@@ -1,6 +1,6 @@
 import cPickle as pickle
 import lda
-from lda_gibbs import LdaSampler
+from serial_lda_gibbs import LdaSampler
 import time
 
 pickle_filepath = 'baseline_data.pickle'
