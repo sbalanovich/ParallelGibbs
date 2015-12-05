@@ -11,6 +11,7 @@ Finding scientifc topics (Griffiths and Steyvers)
 import numpy as np
 import scipy as sp
 from scipy.special import gammaln
+import time
 
 def sample_index(p):
     """
@@ -38,6 +39,17 @@ def log_multi_beta(alpha, K=None):
     else:
         # alpha is assumed to be a scalar
         return K * gammaln(alpha) - gammaln(K*alpha)
+
+#  time class from http://preshing.com/20110924/timing-your-code-using-pythons-with-statement/
+#  and lots of other places on the web
+class Timer:    
+    def __enter__(self):
+        self.start = time.clock()
+        return self
+
+    def __exit__(self, *args):
+        self.end = time.clock()
+        self.interval = self.end - self.start
 
 class LdaSampler(object):
 
@@ -123,22 +135,25 @@ class LdaSampler(object):
         self._initialize(matrix)
 
         for it in xrange(maxiter):
-            for m in xrange(n_docs):
-                for i, w in enumerate(word_indices(matrix[m, :])):
-                    z = self.topics[(m,i)]
-                    self.nmz[m,z] -= 1
-                    self.nm[m] -= 1
-                    self.nzw[z,w] -= 1
-                    self.nz[z] -= 1
+            with Timer() as t:
+                for m in xrange(n_docs):
+                    for i, w in enumerate(word_indices(matrix[m, :])):
+                        z = self.topics[(m,i)]
+                        self.nmz[m,z] -= 1
+                        self.nm[m] -= 1
+                        self.nzw[z,w] -= 1
+                        self.nz[z] -= 1
 
-                    p_z = self._conditional_distribution(m, w)
-                    z = sample_index(p_z)
+                        p_z = self._conditional_distribution(m, w)
+                        z = sample_index(p_z)
 
-                    self.nmz[m,z] += 1
-                    self.nm[m] += 1
-                    self.nzw[z,w] += 1
-                    self.nz[z] += 1
-                    self.topics[(m,i)] = z
+                        self.nmz[m,z] += 1
+                        self.nm[m] += 1
+                        self.nzw[z,w] += 1
+                        self.nz[z] += 1
+                        self.topics[(m,i)] = z
+
+            print 'Sampled in %.3f seconds' % t.interval
 
             yield self.phi()
 

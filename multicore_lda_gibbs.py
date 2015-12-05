@@ -9,9 +9,11 @@ Finding scientifc topics (Griffiths and Steyvers)
 """
 from copy import copy
 import numpy as np
-from multiprocessing import Pool
+from multiprocessing.pool import ThreadPool as Pool
+# from multiprocessing import Pool
 import scipy as sp
 from scipy.special import gammaln
+import time
 
 def sample_index(p):
     """
@@ -41,6 +43,19 @@ def log_multi_beta(alpha, K=None):
     else:
         # alpha is assumed to be a scalar
         return K * gammaln(alpha) - gammaln(K*alpha)
+
+
+#  time class from http://preshing.com/20110924/timing-your-code-using-pythons-with-statement/
+#  and lots of other places on the web
+class Timer:    
+    def __enter__(self):
+        self.start = time.clock()
+        return self
+
+    def __exit__(self, *args):
+        self.end = time.clock()
+        self.interval = self.end - self.start
+
 
 class MulticoreLdaSampler(object):
 
@@ -177,14 +192,19 @@ class MulticoreLdaSampler(object):
                         self.local_nzw[p][z,w] += 1
                         self.local_nz[p][z] += 1
                         self.topics[(m,i)] = z
+                return 1, 2
             
-            pool = Pool(processes=self.P)
-            for p in range(self.P):
-                pool.apply_async(sample, [p])
-            pool.close()
-            pool.join()
+            with Timer() as t:
+                pool = Pool(processes=self.P)
+                for p in range(self.P):
+                    pool.apply_async(sample, [p])
+                pool.close()
+                pool.join()
+            print 'Sampled in %.3f seconds' % t.interval
 
-            self._global_update()
+            with Timer() as t:
+                self._global_update()
+            print 'Updated in %.3f seconds' % t.interval
 
             yield self.phi()
 

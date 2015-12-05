@@ -59,7 +59,8 @@ class Timer:
 
 if __name__ == '__main__':
     X, vocab, titles = load_reuters_dataset()
-    multicore_gibbs(X, 10, 4)
+    # baseline(X, 10)
+    multicore_gibbs(X, 10, 16)
 
 
     
