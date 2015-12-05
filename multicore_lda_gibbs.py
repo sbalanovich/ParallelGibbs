@@ -157,7 +157,8 @@ class MulticoreLdaSampler(object):
         self._initialize(matrix)
 
         for it in xrange(maxiter):
-            for p in range(self.P):
+            
+            def sample(p):
                 for m in self.docs_by_processor[p]:
                     for i, w in enumerate(word_indices(matrix[m, :])):
                         z = self.topics[(m,i)]
@@ -176,6 +177,12 @@ class MulticoreLdaSampler(object):
                         self.local_nzw[p][z,w] += 1
                         self.local_nz[p][z] += 1
                         self.topics[(m,i)] = z
+            
+            pool = Pool(processes=self.P)
+            for p in range(self.P):
+                pool.apply_async(sample, [p])
+            pool.close()
+            pool.join()
 
             self._global_update()
 
