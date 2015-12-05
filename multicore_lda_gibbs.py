@@ -45,18 +45,6 @@ def log_multi_beta(alpha, K=None):
         return K * gammaln(alpha) - gammaln(K*alpha)
 
 
-#  time class from http://preshing.com/20110924/timing-your-code-using-pythons-with-statement/
-#  and lots of other places on the web
-class Timer:    
-    def __enter__(self):
-        self.start = time.clock()
-        return self
-
-    def __exit__(self, *args):
-        self.end = time.clock()
-        self.interval = self.end - self.start
-
-
 class MulticoreLdaSampler(object):
 
     def __init__(self, n_topics, P, alpha=0.1, beta=0.1):
@@ -70,6 +58,9 @@ class MulticoreLdaSampler(object):
         self.beta = beta
         self.P = P
         self.pool = Pool(processes=P)
+
+        self.sample_times = []
+        self.update_times = []
 
 
 
@@ -159,22 +150,27 @@ class MulticoreLdaSampler(object):
 
         for it in xrange(maxiter):
 
-            with Timer() as t:
-                sample_for_p = partial(sample, self.topics, matrix, self.docs_by_processor,self.nmz, self.nm, self.local_nzw, self.local_nz, self.alpha, self.beta)
-                results = self.pool.map(sample_for_p, range(self.P))
-            
-                for p, (nz, nzw, nm, nmz, topics) in enumerate(results):
-                    indices = self.docs_by_processor[p]
-                    self.local_nz[p], self.local_nzw[p] = nz, nzw
-                    self.nm[indices] = nm
-                    self.nmz[indices] = nmz
-                    self.topics[indices] = topics
+            start = time.time()
 
-            print 'Sampled in %.3f seconds' % t.interval
+            sample_for_p = partial(sample, self.topics, matrix, self.docs_by_processor,self.nmz, self.nm, self.local_nzw, self.local_nz, self.alpha, self.beta)
+            results = self.pool.map(sample_for_p, range(self.P))
+        
+            for p, (nz, nzw, nm, nmz, topics) in enumerate(results):
+                indices = self.docs_by_processor[p]
+                self.local_nz[p], self.local_nzw[p] = nz, nzw
+                self.nm[indices] = nm
+                self.nmz[indices] = nmz
+                self.topics[indices] = topics
 
-            with Timer() as t:
-                self._global_update()
-            print 'Updated in %.3f seconds' % t.interval
+            end = time.time()
+            self.sample_times.append(start-end)
+            print 'Sampled in %.3f seconds' % (end - start)
+
+            start = time.time()
+            self._global_update()
+            end = time.time()
+            self.update_times.append(start-end)
+            print 'Updated in %.3f seconds' % (end - start)
 
             yield 1#self.phi()
 
@@ -214,104 +210,4 @@ def sample(topics, matrix, docs_by_processor, nmz, nm, local_nzw, local_nz, alph
             topics[m,i] = z
     
     return local_nz[p], local_nzw[p], nm[docs_by_processor[p]], nmz[docs_by_processor[p]], topics[docs_by_processor[p]]
-
-
-if __name__ == "__main__":
-    import os
-    import shutil
-
-    N_TOPICS = 10
-    DOCUMENT_LENGTH = 100
-    FOLDER = "topicimg"
-
-    def vertical_topic(width, topic_index, document_length):
-        """
-        Generate a topic whose words form a vertical bar.
-        """
-        m = np.zeros((width, width))
-        m[:, topic_index] = int(document_length / width)
-        return m.flatten()
-
-    def horizontal_topic(width, topic_index, document_length):
-        """
-        Generate a topic whose words form a horizontal bar.
-        """
-        m = np.zeros((width, width))
-        m[topic_index, :] = int(document_length / width)
-        return m.flatten()
-
-    def save_document_image(filename, doc, zoom=2):
-        """
-        Save document as an image.
-
-        doc must be a square matrix
-        """
-        height, width = doc.shape
-        zoom = np.ones((width*zoom, width*zoom))
-        # imsave scales pixels between 0 and 255 automatically
-        sp.misc.imsave(filename, np.kron(doc, zoom))
-
-    def gen_word_distribution(n_topics, document_length):
-        """
-        Generate a word distribution for each of the n_topics.
-        """
-        width = n_topics / 2
-        vocab_size = width ** 2
-        m = np.zeros((n_topics, vocab_size))
-
-        for k in range(width):
-            m[k,:] = vertical_topic(width, k, document_length)
-
-        for k in range(width):
-            m[k+width,:] = horizontal_topic(width, k, document_length)
-
-        m /= m.sum(axis=1)[:, np.newaxis] # turn counts into probabilities
-
-        return m
-
-    def gen_document(word_dist, n_topics, vocab_size, length=DOCUMENT_LENGTH, alpha=0.1):
-        """
-        Generate a document:
-            1) Sample topic proportions from the Dirichlet distribution.
-            2) Sample a topic index from the Multinomial with the topic
-               proportions from 1).
-            3) Sample a word from the Multinomial corresponding to the topic
-               index from 2).
-            4) Go to 2) if need another word.
-        """
-        theta = np.random.mtrand.dirichlet([alpha] * n_topics)
-        v = np.zeros(vocab_size)
-        for n in range(length):
-            z = sample_index(theta)
-            w = sample_index(word_dist[z,:])
-            v[w] += 1
-        return v
-
-    def gen_documents(word_dist, n_topics, vocab_size, n=500):
-        """
-        Generate a document-term matrix.
-        """
-        m = np.zeros((n, vocab_size))
-        for i in xrange(n):
-            m[i, :] = gen_document(word_dist, n_topics, vocab_size)
-        return m
-
-    if os.path.exists(FOLDER):
-        shutil.rmtree(FOLDER)
-    os.mkdir(FOLDER)
-
-    width = N_TOPICS / 2
-    vocab_size = width ** 2
-    word_dist = gen_word_distribution(N_TOPICS, DOCUMENT_LENGTH)
-    matrix = gen_documents(word_dist, N_TOPICS, vocab_size)
-    sampler = LdaSampler(N_TOPICS)
-
-    for it, phi in enumerate(sampler.run(matrix)):
-        print "Iteration", it
-        print "Likelihood", sampler.loglikelihood()
-
-        if it % 5 == 0:
-            for z in range(N_TOPICS):
-                save_document_image("topicimg/topic%d-%d.png" % (it,z),
-                                    phi[z,:].reshape(width,-1))
 

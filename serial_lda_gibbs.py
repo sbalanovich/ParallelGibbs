@@ -40,17 +40,6 @@ def log_multi_beta(alpha, K=None):
         # alpha is assumed to be a scalar
         return K * gammaln(alpha) - gammaln(K*alpha)
 
-#  time class from http://preshing.com/20110924/timing-your-code-using-pythons-with-statement/
-#  and lots of other places on the web
-class Timer:    
-    def __enter__(self):
-        self.start = time.clock()
-        return self
-
-    def __exit__(self, *args):
-        self.end = time.clock()
-        self.interval = self.end - self.start
-
 class LdaSampler(object):
 
     def __init__(self, n_topics, alpha=0.1, beta=0.1):
@@ -135,25 +124,26 @@ class LdaSampler(object):
         self._initialize(matrix)
 
         for it in xrange(maxiter):
-            with Timer() as t:
-                for m in xrange(n_docs):
-                    for i, w in enumerate(word_indices(matrix[m, :])):
-                        z = self.topics[(m,i)]
-                        self.nmz[m,z] -= 1
-                        self.nm[m] -= 1
-                        self.nzw[z,w] -= 1
-                        self.nz[z] -= 1
+            start = time.time()
+            for m in xrange(n_docs):
+                for i, w in enumerate(word_indices(matrix[m, :])):
+                    z = self.topics[(m,i)]
+                    self.nmz[m,z] -= 1
+                    self.nm[m] -= 1
+                    self.nzw[z,w] -= 1
+                    self.nz[z] -= 1
 
-                        p_z = self._conditional_distribution(m, w)
-                        z = sample_index(p_z)
+                    p_z = self._conditional_distribution(m, w)
+                    z = sample_index(p_z)
 
-                        self.nmz[m,z] += 1
-                        self.nm[m] += 1
-                        self.nzw[z,w] += 1
-                        self.nz[z] += 1
-                        self.topics[(m,i)] = z
+                    self.nmz[m,z] += 1
+                    self.nm[m] += 1
+                    self.nzw[z,w] += 1
+                    self.nz[z] += 1
+                    self.topics[(m,i)] = z
+            end = time.time()
 
-            print 'Sampled in %.3f seconds' % t.interval
+            print 'Sampled in %.3f seconds' % (end-start)
 
             yield self.phi()
 

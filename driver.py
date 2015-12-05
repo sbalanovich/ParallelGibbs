@@ -36,31 +36,19 @@ def baseline(X, k):
 
     print 'Fit in %.3f seconds' % t.interval
 
-def multicore_gibbs(X, k, p):
+def multicore_gibbs(X, k, p, iters=50):
     sampler = MulticoreLdaSampler(k, p)
-    with Timer() as t:
-        for it, phi in enumerate(sampler.run(X, maxiter=50)):
-            print "Iteration", it
-            # print "Likelihood", sampler.loglikelihood()
-
-    print 'Fit in %.3f seconds' % t.interval
-
-
-#  time class from http://preshing.com/20110924/timing-your-code-using-pythons-with-statement/
-#  and lots of other places on the web
-class Timer:    
-    def __enter__(self):
-        self.start = time.clock()
-        return self
-
-    def __exit__(self, *args):
-        self.end = time.clock()
-        self.interval = self.end - self.start
+    start = time.time()
+    for it, phi in enumerate(sampler.run(X, maxiter=iters)):
+        print "Iteration", it
+        # print "Likelihood", sampler.loglikelihood()
+    end = time.time()
+    print 'Completed %d iterations in %.3f seconds' % (iters, end - start)
 
 if __name__ == '__main__':
     X, vocab, titles = load_reuters_dataset()
     # baseline(X, 10)
-    multicore_gibbs(X, 10, 1)
+    multicore_gibbs(X, 10, 16)
 
 
     
