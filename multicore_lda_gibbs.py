@@ -9,6 +9,7 @@ Finding scientifc topics (Griffiths and Steyvers)
 """
 from copy import copy
 import numpy as np
+from multiprocessing import Pool
 import scipy as sp
 from scipy.special import gammaln
 
@@ -16,6 +17,8 @@ def sample_index(p):
     """
     Sample from the Multinomial distribution and return the sample index.
     """
+    if not sum(p[:-1]) <= 1:
+        print p
     return np.random.multinomial(1,p).argmax()
 
 def word_indices(vec):
@@ -91,27 +94,27 @@ class MulticoreLdaSampler(object):
 
     def _global_update(self):
 
-        for i, w in enumerate(word_indices(matrix[m, :])):
-            update = sum([self.nzw[:,w] - self.local_nzw[p][:,w] for p in range(self.P)])
+        vocab_size = self.nzw.shape[1]
+        for w in xrange(vocab_size):
+            update = sum([self.local_nzw[p][:,w]  - self.nzw[:,w] for p in range(self.P)])
             self.nzw[:,w] = self.nzw[:,w] + update
 
-            for z in range(n_topics):
-                self.nz = sum([self.local_nz[p][z] for p in range(P)])
-
-
+        for z in xrange(self.n_topics):
+            update = sum([self.local_nz[p][z] - self.nz[z] for p in range(self.P)])
+            self.nz[z] = self.nz[z] + update
 
         self.local_nzw = [copy(self.nzw) for p in range(self.P)]
         self.local_nz = [copy(self.nz) for p in range(self.P)]
 
 
 
-    def _conditional_distribution(self, m, w):
+    def _conditional_distribution(self, m, w, p):
         """
         Conditional distribution (vector of size n_topics).
         """
-        vocab_size = self.nzw.shape[1]
-        left = (self.nzw[:,w] + self.beta) / \
-               (self.nz + self.beta * vocab_size)
+        vocab_size = self.local_nzw[p].shape[1]
+        left = (self.local_nzw[p][:,w] + self.beta) / \
+               (self.local_nz[p] + self.beta * vocab_size)
         right = (self.nmz[m,:] + self.alpha) / \
                 1 #(self.nm[m] + self.alpha * self.n_topics)
         p_z = left * right
@@ -154,22 +157,27 @@ class MulticoreLdaSampler(object):
         self._initialize(matrix)
 
         for it in xrange(maxiter):
-            for m in xrange(n_docs):
-                for i, w in enumerate(word_indices(matrix[m, :])):
-                    z = self.topics[(m,i)]
-                    self.nmz[m,z] -= 1
-                    self.nm[m] -= 1
-                    self.nzw[z,w] -= 1
-                    self.nz[z] -= 1
+            for p in range(self.P):
+                for m in self.docs_by_processor[p]:
+                    for i, w in enumerate(word_indices(matrix[m, :])):
+                        z = self.topics[(m,i)]
+                        self.nmz[m,z] -= 1
+                        self.nm[m] -= 1
+                        self.local_nzw[p][z,w] -= 1
+                        self.local_nz[p][z] -= 1
 
-                    p_z = self._conditional_distribution(m, w)
-                    z = sample_index(p_z)
+                        p_z = self._conditional_distribution(m, w, p)
+                        if not np.isclose(np.sum(p_z), 1.):
+                            print p_z
+                        z = sample_index(p_z)
 
-                    self.nmz[m,z] += 1
-                    self.nm[m] += 1
-                    self.nzw[z,w] += 1
-                    self.nz[z] += 1
-                    self.topics[(m,i)] = z
+                        self.nmz[m,z] += 1
+                        self.nm[m] += 1
+                        self.local_nzw[p][z,w] += 1
+                        self.local_nz[p][z] += 1
+                        self.topics[(m,i)] = z
+
+            self._global_update()
 
             yield self.phi()
 
