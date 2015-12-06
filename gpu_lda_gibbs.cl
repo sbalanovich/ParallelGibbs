@@ -77,7 +77,7 @@ sample(__global __read_only int* topics,
     size_t global_sz = get_global_size(0);
     size_t local_sz = get_local_size(0);
 
-    // global_sz += 1;
+    global_sz = (global_sz <= 0 ) ? 1 : global_sz;
     int k_words = ceil((float) n_words / global_sz);
     int k_docs = ceil((float) n_docs / global_sz);
     printf("%d %d %d %d %d\n", local_id, global_id, group_id, k_words, k_docs);
