@@ -221,7 +221,8 @@ class GPULdaSampler(object):
 
                 # Enqueues
                 # gpu_topics = self.topics 
-                cl.enqueue_copy(queue, gpu_topics, self.topics, is_blocking=False)
+                print self.topics.shape
+                # cl.enqueue_copy(queue, gpu_topics, self.topics, is_blocking=False)
                 # gpu_matrix = matrix
                 # gpu_nzw = self.nzw
                 # global_nmz = self.nmz
