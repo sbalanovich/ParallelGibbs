@@ -82,8 +82,8 @@ if __name__ == '__main__':
     # baseline(X, 10)
     # multicore_gibbs(X, 10, 16)
     import numpy as np
-    # X = np.ones((10, 10)).astype(np.int32)
-    gpu_gibbs(X, N_TOPICS, 2000, iters=MAXITER)
+    X = np.ones((10, 10)).astype(np.int32)
+    gpu_gibbs(X, N_TOPICS, 5, iters=50)
 
 
     
