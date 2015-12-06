@@ -200,10 +200,16 @@ class GPULdaSampler(object):
                 ## Outputs
                 # p_z - probability vector
 
+                # Flatten
+                flat_matrix = np.ravel(matrix)
+                flat_nzw = np.ravel(self.nzw).astype(np.int32)
+                flat_nmz = np.ravel(self.nmz).astype(np.int32)
+                print flat_matrix.size
+
                 # Input Buffers
-                gpu_matrix = cl.Buffer(context, cl.mem_flags.READ_ONLY, matrix.size * 4)
-                gpu_nzw = cl.Buffer(context, cl.mem_flags.READ_ONLY, self.nzw.size * 4)
-                global_nmz = cl.Buffer(context, cl.mem_flags.READ_ONLY, self.nmz.size * 4)
+                gpu_matrix = cl.Buffer(context, cl.mem_flags.READ_ONLY, flat_matrix.size * 4)
+                gpu_nzw = cl.Buffer(context, cl.mem_flags.READ_ONLY, flat_nzw.size * 4)
+                global_nmz = cl.Buffer(context, cl.mem_flags.READ_ONLY, flat_nmz.size * 4)
                 
                 # Ints and Floats
                 alpha = np.float32(self.alpha)
@@ -219,12 +225,9 @@ class GPULdaSampler(object):
                 pnz = np.zeros(self.n_topics)
 
                 # Enqueues
-                # gpu_topics = self.topics 
-                # print self.topics.shape
-                # cl.enqueue_copy(queue, gpu_topics, self.topics, is_blocking=False)
-                # gpu_matrix = matrix
-                # gpu_nzw = self.nzw
-                # global_nmz = self.nmz
+                cl.enqueue_copy(queue, gpu_matrix, flat_matrix, is_blocking=False)
+                cl.enqueue_copy(queue, gpu_nzw, flat_nzw, is_blocking=False)
+                cl.enqueue_copy(queue, global_nmz, flat_nmz, is_blocking=False)
 
                 event = program.sample(queue, global_size, local_size,
                                         gpu_matrix, gpu_nzw, global_nmz,
