@@ -151,11 +151,15 @@ class MulticoreLdaSampler(object):
         for it in xrange(maxiter):
 
             start = time.time()
+            results = []
+            for p in range(self.P):
+                args = [self.topics, matrix[self.docs_by_processor[p]], self.docs_by_processor,
+                    self.nmz, self.nm, self.local_nzw[p], self.local_nz[p], self.alpha, self.beta, p]
+                results.append(self.pool.apply_async(sample, args))
 
-            sample_for_p = partial(sample, self.topics, matrix, self.docs_by_processor,self.nmz, self.nm, self.local_nzw, self.local_nz, self.alpha, self.beta)
-            results = self.pool.map(sample_for_p, range(self.P))
         
-            for p, (nz, nzw, nm, nmz, topics) in enumerate(results):
+            for p, res in enumerate(results):
+                nz, nzw, nm, nmz, topics = res.get()
                 indices = self.docs_by_processor[p]
                 self.local_nz[p], self.local_nzw[p] = nz, nzw
                 self.nm[indices] = nm
@@ -178,9 +182,9 @@ def conditional_distribution(m, w, p, nmz, local_nzw, local_nz, alpha, beta):
     """
     Conditional distribution (vector of size n_topics).
     """
-    vocab_size = local_nzw[p].shape[1]
-    left = (local_nzw[p][:,w] + beta) / \
-           (local_nz[p] + beta * vocab_size)
+    vocab_size = local_nzw.shape[1]
+    left = (local_nzw[:,w] + beta) / \
+           (local_nz + beta * vocab_size)
     right = (nmz[m,:] + alpha) / \
             1 #(self.nm[m] + self.alpha * self.n_topics)
     p_z = left * right
@@ -188,15 +192,14 @@ def conditional_distribution(m, w, p, nmz, local_nzw, local_nz, alpha, beta):
     p_z /= np.sum(p_z)
     return p_z
 
-
-def sample(topics, matrix, docs_by_processor, nmz, nm, local_nzw, local_nz, alpha, beta, p):
-    for m in docs_by_processor[p]:
-        for i, w in enumerate(word_indices(matrix[m, :])):
-            z = topics[(m,i)]
+def sample(topics, matrix_slice, docs_by_processor, nmz, nm, local_nzw, local_nz, alpha, beta, p):
+    for word_number, m in enumerate(docs_by_processor[p]):
+        for i, w in enumerate(word_indices(matrix_slice[word_number])):
+            z = topics[m,i]
             nmz[m,z] -= 1
             nm[m] -= 1
-            local_nzw[p][z,w] -= 1
-            local_nz[p][z] -= 1
+            local_nzw[z,w] -= 1
+            local_nz[z] -= 1
 
             p_z = conditional_distribution(m, w, p, nmz, local_nzw, local_nz, alpha, beta)
             if not np.isclose(np.sum(p_z), 1.):
@@ -205,9 +208,9 @@ def sample(topics, matrix, docs_by_processor, nmz, nm, local_nzw, local_nz, alph
 
             nmz[m,z] += 1
             nm[m] += 1
-            local_nzw[p][z,w] += 1
-            local_nz[p][z] += 1
+            local_nzw[z,w] += 1
+            local_nz[z] += 1
             topics[m,i] = z
     
-    return local_nz[p], local_nzw[p], nm[docs_by_processor[p]], nmz[docs_by_processor[p]], topics[docs_by_processor[p]]
+    return local_nz, local_nzw, nm[docs_by_processor[p]], nmz[docs_by_processor[p]], topics[docs_by_processor[p]]
 
