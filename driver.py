@@ -30,9 +30,9 @@ def dump_reuters_dataset():
 def baseline(X, k, iters=50):
     sampler = LdaSampler(k)
     start = time.time()
-        for it, phi in enumerate(sampler.run(X, maxiter=iters)):
-            print "Iteration", it
-            print "Likelihood", sampler.loglikelihood()
+    for it, phi in enumerate(sampler.run(X, maxiter=iters)):
+        print "Iteration", it
+        print "Likelihood", sampler.loglikelihood()
     end = time.time()
     print 'Completed %d iterations in %.3f seconds (serial)' % (iters, end - start)
 
