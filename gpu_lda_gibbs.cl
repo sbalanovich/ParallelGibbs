@@ -1,6 +1,6 @@
 int*
 cond_distr(int m, int w, int n_topics, float beta, float alpha, 
-            int* my_nzw, int* nz, int* nmz, int num_words)
+            int* nzw, int* nz, int* nmz, int num_words)
 {
         // num_words = num words for this processor
         // n_topics = number of topics in total
@@ -28,41 +28,18 @@ cond_distr(int m, int w, int n_topics, float beta, float alpha,
 __kernel void
 sample(__global __read_only int* topics, 
        __global __read_only int* matrix, 
-       __global __read_only int* my_nzw, 
+       __global __read_only int* nzw, 
        __global __read_only int* nmz,
+       __global __read_only int* nz, 
+       __global __read_only int* nm,
        __global __write_only int* gpu_pnz, 
+       __local int *topic_buffer,
+       __local int *nmz_buffer, __local int *nm_buffer,
+       __local int *nzw_buffer, __local int *nz_buffer,
        int p, int n_topics, int n_words, 
        int n_docs, float alpha, float beta)
 {
-    // Build NZ array
-    // n_words = num words for this processor
-    // n_topics = number of topics in total
-    // nz = my_nzw summed over w
-    // int* nz = malloc(n_topics * sizeof(int));
-    int nz[10];
-    for (int i = 0; i < n_topics; i++)
-    {
-        for (int j = 0; j < n_words; j++) 
-        {
-            if (nz[i])
-                nz[i] += my_nzw[i * n_words + j];
-            else
-                nz[i] = my_nzw[i * n_words + j];
-        }
-    }
-
-    int nz[10];
-    for (int i = 0; i < n_topics; i++)
-    {
-        for (int j = 0; j < n_words; j++) 
-        {
-            if (nz[i])
-                nz[i] += my_nzw[i * n_words + j];
-            else
-                nz[i] = my_nzw[i * n_words + j];
-        }
-    }
-
+    // Pull in all the ids
     size_t local_id = get_local_id(0);
     size_t global_id = get_global_id(0);
     size_t group_id = get_group_id(0);
@@ -73,45 +50,78 @@ sample(__global __read_only int* topics,
     int k_docs = ceil((float) n_docs / global_sz);
     printf("%d %d %d %d %d\n", local_id, global_id, group_id, k_words, k_docs);
 
-    // thread with global_id 0 should go through docs 0..k_docs-1
-    //                             and through words 0..k_words-1
-    // thread with global_id 1 should go through docs k_docs..2k_docs-1
-    //                             and through words k_words-1..2k_words-1
-    // thread with global_id 2 should go through docs 2k_docs..3k_docs-1
-    //                             and through words 2k_words..3k_words-1
-    // 
-    // Be careful that each thread stays in bounds, both relative to
-    // size of x (i.e., N), and the range it's assigned to sum.
-    for (int m = k_docs * global_id; m < k_docs * (global_id + 1) && m < n_docs; m++) {
-        for (int w = k_words * global_id; w < k_words * (global_id + 1) && w < n_words; w++) { 
-            // topics is num docs x num words
-            int z = *(topics + (m * num_docs + w));
-            *(nmz + m) -= 1;
-            *(nm + m) -= 1;
-            my_nzw
-            ;; // Do stuff per word slice here
+    // Load the relevant topics to a local buffer
+    int topics_sz = n_docs * n_words;
+    for (int t = 0; t < topics_sz; t++) {
+        int doc = k_docs * global_id + t;
+        int word = k_words * global_id + t;
+        topic_buffer[t] = topics[doc * n_docs + word];
+    }
+
+    // barrier(CLK_LOCAL_MEM_FENCE);
+
+    // Load the relevant nmzs to a local buffer
+    int nmzs_sz = n_docs;
+    for (int n = 0; n < nmzs_sz; n++) {
+        int doc = k_docs * global_id + n;
+        for (int topic = 0; topic < n_topics; topic++) {
+            nmz_buffer[n] = nmz[doc * n_docs + topic];
         }
     }
 
+    // barrier(CLK_LOCAL_MEM_FENCE);
+
+    // Load the relevant nms to a local buffer
+    int nms_sz = n_docs;
+    for (int n = 0; n < nms_sz; n++) {
+        int doc = k_docs * global_id + n;
+        nm_buffer[n] = nm[doc * n_docs];
+    }
+
+    // barrier(CLK_LOCAL_MEM_FENCE);
+
+    // Load the relevant nzws to a local buffer
+    int nzws_sz = n_words;
+    for (int topic = 0; topic < n_topics; topic++) {
+        for (int n = 0; n < nzws_sz; n++) {
+            int word = k_words * global_id + n;
+            nzw_buffer[n] = nzw[topic * n_topics + word];
+        }
+    }
+
+    // barrier(CLK_LOCAL_MEM_FENCE);
+
+    // Load the relevant nzs to a local buffer
+    int nzs_sz = n_topics;
+    for (int n = 0; n < nzs_sz; n++) {
+        nz_buffer[n] = nz[n];
+    }
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    for (int m = 0; m < k_docs; m++)
+    {
+        for (int w = 0; w < k_words; w++)
+        {
+            int z = topic_buffer[m * k_docs + w];
+            nmz_buffer[m * k_docs + z] -= 1;
+            nm_buffer[m] -= 1;
+            nzw_buffer[z * n_topics + w] -= 1;
+            nz_buffer[z] -= 1;
+
+            // z = cond_distr(inputs);
+
+            nmz_buffer[m * k_docs + z] += 1;
+            nm_buffer[m] += 1;
+            nzw_buffer[z * n_topics + w] += 1;
+            nz_buffer[z] += 1;
+            topic_buffer[m * k_docs + w] = z;
+        }
+    }
+
+    // barrier(CLK_LOCAL_MEM_FENCE);
+
     return 1;
-    // for m in docs_by_processor[p]:
-    //     for i, w in enumerate(word_indices(matrix[m, :])):
-    //         z = topics[m,i] //num docs x num words
-    //         nmz[m,z] -= 1
-    //         nm[m] -= 1
-    //         local_nzw[p][z,w] -= 1
-    //         local_nz[p][z] -= 1
-
-    //         p_z = conditional_distribution(m, w, p, nmz, local_nzw, local_nz, alpha, beta)
-    //         if not np.isclose(np.sum(p_z), 1.):
-    //             print p_z
-    //         z = sample_index(p_z)
-
-    //         nmz[m,z] += 1
-    //         nm[m] += 1
-    //         local_nzw[p][z,w] += 1
-    //         local_nz[p][z] += 1
-    //         topics[m,i] = z
 }
 
 int
