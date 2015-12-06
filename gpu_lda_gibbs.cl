@@ -152,4 +152,43 @@ sample(__global __read_only int* topics,
     }
 
     barrier(CLK_LOCAL_MEM_FENCE);
+
+    for (int topic = 0; topic < n_topics; topic++) {
+        for (int n = 0; n < nzws_sz; n++) {
+            int word = k_words * global_id + n;
+            nzw[topic * n_topics + word] += nzw_buffer[n] - nzw[topic * n_topics + word];
+        }
+    }
+
+    for (int n = 0; n < nzs_sz; n++) {
+        nz[n] += nz_buffer[n] - nz[n];
+    }
+
+    for (int t = 0; t < topics_sz; t++) {
+        int doc = k_docs * global_id + t;
+        int word = k_words * global_id + t;
+        topics[doc * n_docs + word] = topic_buffer[t];
+    }
+
+    // Load the relevant nmzs to a local buffer
+    for (int n = 0; n < nmzs_sz; n++) {
+        int doc = k_docs * global_id + n;
+        for (int topic = 0; topic < n_topics; topic++) {
+            nmz[doc * n_docs + topic]= nmz_buffer[n];
+        }
+    }
+
+    // Load the relevant nms to a local buffer
+    for (int n = 0; n < nms_sz; n++) {
+        int doc = k_docs * global_id + n;
+        nm[doc * n_docs] = nm_buffer[n];
+    }
+
+
+
+    //update global values
+    // new nzw
+    //for each 
+    // nzw[z, w]
+    // global nzw += local nzw - global nzw
 }
