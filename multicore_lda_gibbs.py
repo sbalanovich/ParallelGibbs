@@ -79,10 +79,10 @@ class MulticoreLdaSampler(object):
         # number of times document m and topic z co-occur
         self.nmz = np.zeros((n_docs, self.n_topics))
         # number of times topic z and word w co-occur
-        self.nzw = np.zeros((self.n_topics, vocab_size))
-        self.nm = np.zeros(n_docs)
-        self.nz = np.zeros(self.n_topics)
-        self.topics = np.zeros((n_docs, vocab_size))
+        self.nzw = np.zeros((self.n_topics, vocab_size)).astype(np.int32)
+        self.nm = np.zeros(n_docs).astype(np.int32)
+        self.nz = np.zeros(self.n_topics).astype(np.int32)
+        self.topics = np.zeros((n_docs, vocab_size)).astype(np.int32)
 
         for m in xrange(n_docs):
             # i is a number between 0 and doc_length-1
@@ -167,13 +167,13 @@ class MulticoreLdaSampler(object):
                 self.topics[indices] = topics
 
             end = time.time()
-            self.sample_times.append(start-end)
+            self.sample_times.append(end-start)
             print 'Sampled in %.3f seconds' % (end - start)
 
             start = time.time()
             self._global_update()
             end = time.time()
-            self.update_times.append(start-end)
+            self.update_times.append(end-start)
             print 'Updated in %.3f seconds' % (end - start)
 
             yield 1#self.phi()
