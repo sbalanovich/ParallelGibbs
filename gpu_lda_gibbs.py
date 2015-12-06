@@ -184,7 +184,7 @@ class GPULdaSampler(object):
         self._initialize(matrix)
         num_workgroups = self.P
         num_workers = 1
-
+        startFit = time.time()
         for it in xrange(maxiter):
             # For P epochs
             for epoch in range(self.P):
@@ -217,6 +217,9 @@ class GPULdaSampler(object):
                 alpha = np.float32(self.alpha)
                 beta = np.float32(self.beta)
                 n_topics = np.int32(self.n_topics)
+                # TODO Word slicing
+                n_docs = np.int32(matrix.shape[0])
+                n_words = np.int32(matrix.shape[1])
                 gpu_p = np.int32(epoch)
 
                 # Sizing
@@ -234,7 +237,7 @@ class GPULdaSampler(object):
 
                 event = program.sample(queue, global_size, local_size,
                                         gpu_topics, gpu_matrix, gpu_nzw, global_nmz,
-                                        gpu_pnz, gpu_p, n_topics, alpha, beta)
+                                        gpu_pnz, gpu_p, n_topics, n_words, n_docs, alpha, beta)
 
                 cl.enqueue_copy(queue, pnz, gpu_pnz, is_blocking=True)
                 seconds = (event.profile.end - event.profile.start) / 1e9
@@ -249,6 +252,6 @@ class GPULdaSampler(object):
 
             print "Iteration " + str(it) + " finished" 
             # print "Likelihood", self.loglikelihood()
-
-        print 'Fit in %.3f seconds' % t.interval
+        endFit = time.time()
+        print 'Fit in %.3f seconds' % (endFit - startFit)
         yield 1
