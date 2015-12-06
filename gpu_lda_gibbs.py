@@ -201,7 +201,6 @@ class GPULdaSampler(object):
                 # p_z - probability vector
 
                 # Input Buffers
-                gpu_topics = cl.Buffer(context, cl.mem_flags.READ_ONLY, self.n_topics * 4)
                 gpu_matrix = cl.Buffer(context, cl.mem_flags.READ_ONLY, matrix.size * 4)
                 gpu_nzw = cl.Buffer(context, cl.mem_flags.READ_ONLY, self.nzw.size * 4)
                 global_nmz = cl.Buffer(context, cl.mem_flags.READ_ONLY, self.nmz.size * 4)
@@ -221,14 +220,14 @@ class GPULdaSampler(object):
 
                 # Enqueues
                 # gpu_topics = self.topics 
-                print self.topics.shape
+                # print self.topics.shape
                 # cl.enqueue_copy(queue, gpu_topics, self.topics, is_blocking=False)
                 # gpu_matrix = matrix
                 # gpu_nzw = self.nzw
                 # global_nmz = self.nmz
 
                 event = program.sample(queue, global_size, local_size,
-                                        gpu_topics, gpu_matrix, gpu_nzw, global_nmz,
+                                        gpu_matrix, gpu_nzw, global_nmz,
                                         gpu_pnz, gpu_p, n_topics, alpha, beta)
 
                 cl.enqueue_copy(queue, pnz, gpu_pnz, is_blocking=True)

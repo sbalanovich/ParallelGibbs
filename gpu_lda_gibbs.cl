@@ -1,13 +1,13 @@
 int*
 cond_distr(int m, int w, int n_topics, float beta, float alpha, 
-            int* my_nzw, int* nmz, int num_words, int num_topics)
+            int* my_nzw, int* nmz, int num_words)
 {
         // num_words = num words for this processor
-        // num_topics = number of topics in total
+        // n_topics = number of topics in total
         // nz = my_nzw summed over w
-        // int* nz = malloc(num_topics * sizeof(int));
+        // int* nz = malloc(n_topics * sizeof(int));
         int nz[10];
-        for (int i = 0; i < num_topics; i++)
+        for (int i = 0; i < n_topics; i++)
         {
             for (int j = 0; j < num_words; j++) 
             {
@@ -22,7 +22,7 @@ cond_distr(int m, int w, int n_topics, float beta, float alpha,
         int left[10];
         int right[10];
 
-        for (int i = 0; i < num_topics; i++)
+        for (int i = 0; i < n_topics; i++)
         {
             int j;
         }
@@ -44,8 +44,7 @@ cond_distr(int m, int w, int n_topics, float beta, float alpha,
 }
 
 __kernel void
-sample(__global __read_only int* topics, 
-       __global __read_only int* matrix, 
+sample(__global __read_only int* matrix, 
        __global __read_only int* nzw, 
        __global __read_only int* nmz,
        __global __write_only int* gpu_pnz, 
