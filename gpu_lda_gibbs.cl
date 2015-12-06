@@ -25,36 +25,36 @@ int cond_distr(int m, int w, int n_topics, float beta, float alpha,
 
 
         //algorithm for sampling from https://github.com/ariddell/lda/blob/develop/lda/_lda.pyx
-        float dist_cum = 0;
-        for k in range(n_topics) {
+        // float dist_cum = 0;
+        // for (int k =0; k < n_topics; k++) {
 
-            dist_cum += (nzw[k * n_topics + w] + beta) / (nz[k] + beta * num_words) * (nmz[m * n_docs + k] + alpha[k]);
-            dist_sum[k] = dist_cum;
-        }
+        //     dist_cum += (nzw[k * n_topics + w] + beta) / (nz[k] + beta * num_words) * (nmz[m * n_docs + k] + alpha);
+        //     dist_sum[k] = dist_cum;
+        // }
 
-        return searchsorted(dist_sum, n_topics, rand() * dist_cum);
+        return 1;//searchsorted(dist_sum, n_topics, rand() * dist_cum);
         
 }
 
 
-int searchsorted(double* arr, int length, double value){
-    """Bisection search (c.f. numpy.searchsorted)
-    Find the index into sorted array `arr` of length `length` such that, if
-    `value` were inserted before the index, the order of `arr` would be
-    preserved. From https://github.com/ariddell/lda/blob/develop/lda/_lda.pyx
-    """
-    int imin, imax, imid;
-    imin = 0;
-    imax = length;
-    while (imin < imax) {
-        imid = imin + ((imax - imin) >> 2);
-        if (value > arr[imid])
-            imin = imid + 1;
-        else
-            imax = imid;
-    }
-    return imin;
-}
+// int searchsorted(double* arr, int length, double value){
+//     """Bisection search (c.f. numpy.searchsorted)
+//     Find the index into sorted array `arr` of length `length` such that, if
+//     `value` were inserted before the index, the order of `arr` would be
+//     preserved. From https://github.com/ariddell/lda/blob/develop/lda/_lda.pyx
+//     """
+//     int imin = 0;
+//     int imax = length;
+//     int imid = 0;
+//     while (imin < imax) {
+//         imid = imin + ((imax - imin) >> 2);
+//         if (value > arr[imid])
+//             imin = imid + 1;
+//         else
+//             imax = imid;
+//     }
+//     return imin;
+// }
 
 __kernel void
 sample(__global __read_only int* topics, 
@@ -74,9 +74,10 @@ sample(__global __read_only int* topics,
     size_t local_id = get_local_id(0);
     size_t global_id = get_global_id(0);
     size_t group_id = get_group_id(0);
-    long global_sz = get_global_size(0);
-    long local_sz = get_local_size(0);
+    size_t global_sz = get_global_size(0);
+    size_t local_sz = get_local_size(0);
 
+    // global_sz += 1;
     int k_words = ceil((float) n_words / global_sz);
     int k_docs = ceil((float) n_docs / global_sz);
     printf("%d %d %d %d %d\n", local_id, global_id, group_id, k_words, k_docs);
@@ -150,7 +151,5 @@ sample(__global __read_only int* topics,
         }
     }
 
-    // barrier(CLK_LOCAL_MEM_FENCE);
-
-    return 1;
+    barrier(CLK_LOCAL_MEM_FENCE);
 }

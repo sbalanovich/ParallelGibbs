@@ -81,6 +81,8 @@ if __name__ == '__main__':
     X, vocab, titles = load_reuters_dataset()
     # baseline(X, 10)
     # multicore_gibbs(X, 10, 16)
+    import numpy as np
+    X = np.ones((10, 10)).astype(np.int32)
     gpu_gibbs(X, N_TOPICS, P, iters=MAXITER)
 
 

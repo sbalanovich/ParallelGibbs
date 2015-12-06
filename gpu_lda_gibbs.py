@@ -167,7 +167,7 @@ class GPULdaSampler(object):
                 print '---------------------------'
 
         # Create a context with all the devices
-        devices = platforms[0].get_devices()
+        devices = platforms[0].get_devices()[1:]
         context = cl.Context(devices)
         print 'This context is associated with ', len(context.devices), 'devices'
 
@@ -245,7 +245,7 @@ class GPULdaSampler(object):
                 cl.enqueue_copy(queue, gpu_nm, self.nm, is_blocking=False)
 
                 event = program.sample(queue, global_size, local_size,
-                                        gpu_topics, gpu_matrix, gpu_nzw, gpu_nmz, 
+                                        gpu_topics, gpu_matrix, gpu_nzw, gpu_nmz,
                                         gpu_nz, gpu_nm, gpu_pnz, 
                                         topics_local_memory, 
                                         nmz_local_memory, nm_local_memory,
