@@ -83,41 +83,43 @@ sample(__global __read_only int* topics,
     printf("%d %d %d %d %d\n", local_id, global_id, group_id, k_words, k_docs);
 
     // Load the relevant topics to a local buffer
-    int topics_sz = n_docs * n_words;
-    for (int t = 0; t < topics_sz; t++) {
-        int doc = k_docs * global_id + t;
-        int word = k_words * global_id + t;
-        topic_buffer[t] = topics[doc * n_docs + word];
+    for (int d = 0; d < k_docs; d++) {
+        int doc = k_docs * global_id + d;
+        for (int w = 0; w < k_words; w++) {
+            int word = k_words * global_id + w;
+            topic_buffer[d * k_words + w] = topics[doc * n_words + word];
+        }
     }
+
 
     // barrier(CLK_LOCAL_MEM_FENCE);
 
     // Load the relevant nmzs to a local buffer
-    int nmzs_sz = n_docs;
+    int nmzs_sz = k_words;
     for (int n = 0; n < nmzs_sz; n++) {
         int doc = k_docs * global_id + n;
         for (int topic = 0; topic < n_topics; topic++) {
-            nmz_buffer[n] = nmz[doc * n_docs + topic];
+            nmz_buffer[n] = nmz[doc * n_topics + topic];
         }
     }
 
     // barrier(CLK_LOCAL_MEM_FENCE);
 
     // Load the relevant nms to a local buffer
-    int nms_sz = n_docs;
+    int nms_sz = k_words;
     for (int n = 0; n < nms_sz; n++) {
         int doc = k_docs * global_id + n;
-        nm_buffer[n] = nm[doc * n_docs];
+        nm_buffer[n] = nm[doc];
     }
 
     // barrier(CLK_LOCAL_MEM_FENCE);
 
     // Load the relevant nzws to a local buffer
-    int nzws_sz = n_words;
+    int nzws_sz = k_words;
     for (int topic = 0; topic < n_topics; topic++) {
         for (int n = 0; n < nzws_sz; n++) {
             int word = k_words * global_id + n;
-            nzw_buffer[n] = nzw[topic * n_topics + word];
+            nzw_buffer[n] = nzw[topic * n_words + word];
         }
     }
 
@@ -135,19 +137,20 @@ sample(__global __read_only int* topics,
     {
         for (int w = 0; w < k_words; w++)
         {
-            int z = topic_buffer[m * k_docs + w];
-            nmz_buffer[m * k_docs + z] -= 1;
+            int z = topic_buffer[m * k_words + w];
+            nmz_buffer[m * n_topics + z] -= 1;
             nm_buffer[m] -= 1;
-            nzw_buffer[z * n_topics + w] -= 1;
+            nzw_buffer[z * k_words + w] -= 1;
+            // printf("##%d## %d ##%d##", z, m * k_words + w, k_docs * k_words);
             nz_buffer[z] -= 1;
 
-            // z = cond_distr(inputs);
+            // // z = cond_distr(inputs);
 
-            nmz_buffer[m * k_docs + z] += 1;
+            nmz_buffer[m * n_topics + z] += 1;
             nm_buffer[m] += 1;
-            nzw_buffer[z * n_topics + w] += 1;
+            nzw_buffer[z * k_words + w] += 1;
             nz_buffer[z] += 1;
-            topic_buffer[m * k_docs + w] = z;
+            topic_buffer[m * k_words + w] = z;
         }
     }
 
@@ -156,7 +159,7 @@ sample(__global __read_only int* topics,
     for (int topic = 0; topic < n_topics; topic++) {
         for (int n = 0; n < nzws_sz; n++) {
             int word = k_words * global_id + n;
-            nzw[topic * n_topics + word] += nzw_buffer[n] - nzw[topic * n_topics + word];
+            nzw[topic * n_words + word] += (nzw_buffer[n] - nzw[topic * n_words + word]);
         }
     }
 
@@ -164,24 +167,26 @@ sample(__global __read_only int* topics,
         nz[n] += nz_buffer[n] - nz[n];
     }
 
-    for (int t = 0; t < topics_sz; t++) {
-        int doc = k_docs * global_id + t;
-        int word = k_words * global_id + t;
-        topics[doc * n_docs + word] = topic_buffer[t];
+    for (int d = 0; d < k_docs; d++) {
+        int doc = k_docs * global_id + d;
+        for (int w = 0; w < k_words; w++) {
+            int word = k_words * global_id + w;
+            topics[doc * n_words + word] = topic_buffer[d * k_words + w];
+        }
     }
 
     // Load the relevant nmzs to a local buffer
     for (int n = 0; n < nmzs_sz; n++) {
         int doc = k_docs * global_id + n;
         for (int topic = 0; topic < n_topics; topic++) {
-            nmz[doc * n_docs + topic]= nmz_buffer[n];
+            nmz[doc * n_topics + topic] = nmz_buffer[n];
         }
     }
 
     // Load the relevant nms to a local buffer
     for (int n = 0; n < nms_sz; n++) {
         int doc = k_docs * global_id + n;
-        nm[doc * n_docs] = nm_buffer[n];
+        nm[doc] = nm_buffer[n];
     }
 
 

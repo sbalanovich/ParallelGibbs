@@ -167,7 +167,7 @@ class GPULdaSampler(object):
                 print '---------------------------'
 
         # Create a context with all the devices
-        devices = platforms[0].get_devices()[1:]
+        devices = platforms[0].get_devices()
         context = cl.Context(devices)
         print 'This context is associated with ', len(context.devices), 'devices'
 
@@ -185,65 +185,68 @@ class GPULdaSampler(object):
         num_workgroups = self.P
         num_workers = 1
         startFit = time.time()
+        
+        ### Sample
+        ## Inputs:
+        # (local) m - doc
+        # (local) w - word
+        # (local) nzw[:,w] - nx|k
+        # (local) nz - nk
+        # (global) nmz[m,:] - nk|j
+        # (global) nm - documents
+
+        ## Outputs
+        # p_z - probability vector
+
+        # Flatten
+        flat_matrix = np.ravel(matrix)
+        flat_topics = np.ravel(self.topics)
+        flat_nzw = np.ravel(self.nzw)
+        flat_nmz = np.ravel(self.nmz)
+
+        # Input Buffers
+        gpu_matrix = cl.Buffer(context, cl.mem_flags.READ_ONLY, flat_matrix.size * 4)
+        gpu_topics = cl.Buffer(context, cl.mem_flags.READ_ONLY, flat_topics.size * 4)
+        gpu_nzw = cl.Buffer(context, cl.mem_flags.READ_ONLY, flat_nzw.size * 4)
+        gpu_nz = cl.Buffer(context, cl.mem_flags.READ_ONLY, self.nz.size * 4)
+        gpu_nmz = cl.Buffer(context, cl.mem_flags.READ_ONLY, flat_nmz.size * 4)
+        gpu_nm = cl.Buffer(context, cl.mem_flags.READ_ONLY, self.nm.size * 4)
+        
+        # Ints and Floats
+        alpha = np.float32(self.alpha)
+        beta = np.float32(self.beta)
+        n_topics = np.int32(self.n_topics)
+        n_docs = np.int32(matrix.shape[0])
+        n_words = np.int32(matrix.shape[1])
+        gpu_p = np.int32(3)
+
+        print n_docs * n_words
+        # Local Memory for Slices
+        topics_local_memory = cl.LocalMemory(4 * n_docs * n_words)
+        nmz_local_memory = cl.LocalMemory(4 * n_docs * n_topics)
+        nm_local_memory = cl.LocalMemory(4 * n_docs)
+        nzw_local_memory = cl.LocalMemory(4 * n_topics * n_words)
+        nz_local_memory = cl.LocalMemory(4 * n_topics)
+
+        # Sizing
+        global_size, local_size = (num_workgroups * num_workers,), (num_workers,)
+
+        # Output
+        gpu_pnz = cl.Buffer(context, cl.mem_flags.WRITE_ONLY, self.topics.size * 4)
+        pnz = np.zeros(self.n_topics)
+
+        # Enqueues
+        cl.enqueue_copy(queue, gpu_matrix, flat_matrix, is_blocking=False)
+        cl.enqueue_copy(queue, gpu_topics, flat_topics, is_blocking=False)
+        cl.enqueue_copy(queue, gpu_nzw, flat_nzw, is_blocking=False)
+        cl.enqueue_copy(queue, gpu_nmz, flat_nmz, is_blocking=False)
+        cl.enqueue_copy(queue, gpu_nz, self.nz, is_blocking=False)
+        cl.enqueue_copy(queue, gpu_nm, self.nm, is_blocking=False)
+        
         for it in xrange(maxiter):
             # For P epochs
             for epoch in range(self.P):
-                ### Sample
-                ## Inputs:
-                # (local) m - doc
-                # (local) w - word
-                # (local) nzw[:,w] - nx|k
-                # (local) nz - nk
-                # (global) nmz[m,:] - nk|j
-                # (global) nm - documents
-
-                ## Outputs
-                # p_z - probability vector
-
-                # Flatten
-                flat_matrix = np.ravel(matrix)
-                flat_topics = np.ravel(self.topics)
-                flat_nzw = np.ravel(self.nzw)
-                flat_nmz = np.ravel(self.nmz)
-
-                # Input Buffers
-                gpu_matrix = cl.Buffer(context, cl.mem_flags.READ_ONLY, flat_matrix.size * 4)
-                gpu_topics = cl.Buffer(context, cl.mem_flags.READ_ONLY, flat_topics.size * 4)
-                gpu_nzw = cl.Buffer(context, cl.mem_flags.READ_ONLY, flat_nzw.size * 4)
-                gpu_nz = cl.Buffer(context, cl.mem_flags.READ_ONLY, self.nz.size * 4)
-                gpu_nmz = cl.Buffer(context, cl.mem_flags.READ_ONLY, flat_nmz.size * 4)
-                gpu_nm = cl.Buffer(context, cl.mem_flags.READ_ONLY, self.nm.size * 4)
-                
-                # Ints and Floats
-                alpha = np.float32(self.alpha)
-                beta = np.float32(self.beta)
-                n_topics = np.int32(self.n_topics)
-                n_docs = np.int32(matrix.shape[0])
-                n_words = np.int32(matrix.shape[1])
-                gpu_p = np.int32(epoch)
-
-                # Local Memory for Slices
-                topics_local_memory = cl.LocalMemory(4 * n_docs * n_words / num_workgroups)
-                nmz_local_memory = cl.LocalMemory(4 * n_docs * n_topics / num_workgroups)
-                nm_local_memory = cl.LocalMemory(4 * n_docs / num_workgroups)
-                nzw_local_memory = cl.LocalMemory(4 * n_topics * n_words / num_workgroups)
-                nz_local_memory = cl.LocalMemory(4 * n_topics / num_workgroups)
-
-                # Sizing
-                global_size, local_size = (num_workgroups * num_workers,), (num_workers,)
-
-                # Output
-                gpu_pnz = cl.Buffer(context, cl.mem_flags.WRITE_ONLY, self.topics.size * 4)
-                pnz = np.zeros(self.n_topics)
-
-                # Enqueues
-                cl.enqueue_copy(queue, gpu_matrix, flat_matrix, is_blocking=False)
-                cl.enqueue_copy(queue, gpu_topics, flat_topics, is_blocking=False)
-                cl.enqueue_copy(queue, gpu_nzw, flat_nzw, is_blocking=False)
-                cl.enqueue_copy(queue, gpu_nmz, flat_nmz, is_blocking=False)
-                cl.enqueue_copy(queue, gpu_nz, self.nz, is_blocking=False)
-                cl.enqueue_copy(queue, gpu_nm, self.nm, is_blocking=False)
-
+    
                 event = program.sample(queue, global_size, local_size,
                                         gpu_topics, gpu_matrix, gpu_nzw, gpu_nmz,
                                         gpu_nz, gpu_nm, gpu_pnz, 
