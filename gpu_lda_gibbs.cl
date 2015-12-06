@@ -1,28 +1,59 @@
-int*
-cond_distr(int m, int w, int n_topics, float beta, float alpha, 
-            int* my_nzw, int* nz, int* nmz, int num_words)
-{
+
+int cond_distr(int m, int w, int n_topics, float beta, float alpha, 
+            int* my_nzw, int* nz, int* nmz, int num_words, int n_docs) {
         // num_words = num words for this processor
         // n_topics = number of topics in total
 
-        int vocab_size = num_words;
-        int left[10];
-        int right[10];
+        // int vocab_size = num_words;
+        // int left[10];
+        // int right[10];
 
-        // left = (nzw[:,w] + beta) / (nz + beta * vocab_size)
-        // right = (self.nmz[m,:] + self.alpha)
+        // // left = (nzw[:,w] + beta) / (nz + beta * vocab_size)
+        // // right = (self.nmz[m,:] + self.alpha)
 
-        // int* pnz = left * right;
-        int pnz[10];
-        int pnz_sum = 0;
-        for(int i = 0; i < n_topics; i++) {
-            pnz_sum += pnz[i];
+        // // int* pnz = left * right;
+        // int pnz[10];
+        // int pnz_sum = 0;
+        // for(int i = 0; i < n_topics; i++) {
+        //     pnz_sum += pnz[i];
+        // }
+        // // normalize to obtain probabilities
+        // for(int i = 0; i < n_topics; i++) {
+        //     pnz[i] /= pnz_sum;
+        // }
+        // return pnz;
+
+
+        //algorithm for sampling from https://github.com/ariddell/lda/blob/develop/lda/_lda.pyx
+        float dist_cum = 0;
+        for k in range(n_topics) {
+
+            dist_cum += (nzw[k * n_topics + w] + beta) / (nz[k] + beta * num_words) * (nmz[m * n_docs + k] + alpha[k]);
+            dist_sum[k] = dist_cum;
         }
-        // normalize to obtain probabilities
-        for(int i = 0; i < n_topics; i++) {
-            pnz[i] /= pnz_sum;
-        }
-        return pnz;
+
+        return searchsorted(dist_sum, n_topics, rand() * dist_cum);
+        
+}
+
+
+int searchsorted(double* arr, int length, double value){
+    """Bisection search (c.f. numpy.searchsorted)
+    Find the index into sorted array `arr` of length `length` such that, if
+    `value` were inserted before the index, the order of `arr` would be
+    preserved. From https://github.com/ariddell/lda/blob/develop/lda/_lda.pyx
+    """
+    int imin, imax, imid;
+    imin = 0;
+    imax = length;
+    while (imin < imax) {
+        imid = imin + ((imax - imin) >> 2);
+        if (value > arr[imid])
+            imin = imid + 1;
+        else
+            imax = imid;
+    }
+    return imin;
 }
 
 __kernel void
@@ -112,12 +143,4 @@ sample(__global __read_only int* topics,
     //         local_nzw[p][z,w] += 1
     //         local_nz[p][z] += 1
     //         topics[m,i] = z
-}
-
-int
-sample_index(int p) 
-{
-    //Sample from the Multinomial distribution and return the sample index.
-    //return np.random.multinomial(1,p).argmax()
-    int j;
 }

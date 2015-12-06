@@ -79,10 +79,10 @@ class MulticoreLdaSampler(object):
         # number of times document m and topic z co-occur
         self.nmz = np.zeros((n_docs, self.n_topics))
         # number of times topic z and word w co-occur
-        self.nzw = np.zeros((self.n_topics, vocab_size)).astype(np.int32)
-        self.nm = np.zeros(n_docs).astype(np.int32)
-        self.nz = np.zeros(self.n_topics).astype(np.int32)
-        self.topics = np.zeros((n_docs, vocab_size)).astype(np.int32)
+        self.nzw = np.zeros((self.n_topics, vocab_size))
+        self.nm = np.zeros(n_docs)
+        self.nz = np.zeros(self.n_topics)
+        self.topics = np.zeros((n_docs, vocab_size))
 
         for m in xrange(n_docs):
             # i is a number between 0 and doc_length-1
@@ -100,6 +100,7 @@ class MulticoreLdaSampler(object):
         self.local_nz = [copy(self.nz) for p in range(self.P)]
 
     def _global_update(self):
+        """Reduce scatter operation to update"""
 
         vocab_size = self.nzw.shape[1]
         for w in xrange(vocab_size):
