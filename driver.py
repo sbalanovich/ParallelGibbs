@@ -3,7 +3,6 @@ import lda
 import os
 from serial_lda_gibbs import LdaSampler
 from multicore_lda_gibbs import MulticoreLdaSampler
-from gpu_lda_gibbs import GPULdaSampler
 import time
 
 pickle_filepath = 'baseline_data.pickle'
