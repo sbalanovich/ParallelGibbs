@@ -3,9 +3,14 @@ import lda
 import os
 from serial_lda_gibbs import LdaSampler
 from multicore_lda_gibbs import MulticoreLdaSampler
+from gpu_lda_gibbs import GPULdaSampler
 import time
 
 pickle_filepath = 'baseline_data.pickle'
+N_TOPICS = 10
+DOCUMENT_LENGTH = 100
+MAXITER = 50
+P = 2
 
 def main():
     pass
@@ -45,10 +50,20 @@ def multicore_gibbs(X, k, p, iters=50):
     end = time.time()
     print 'Completed %d iterations in %.3f seconds (P=%d)' % (iters, end - start, p)
 
+def gpu_gibbs(X, k, p, iters=50):
+    sampler = GPULdaSampler(k, p)
+    start = time.time()
+    for it, phi in enumerate(sampler.run(X, maxiter=iters)):
+        print "Iteration", it
+        # print "Likelihood", sampler.loglikelihood()
+    end = time.time()
+    print 'Completed %d iterations in %.3f seconds (P=%d)' % (iters, end - start, p)
+
 if __name__ == '__main__':
     X, vocab, titles = load_reuters_dataset()
     # baseline(X, 10)
-    multicore_gibbs(X, 10, 16)
+    # multicore_gibbs(X, 10, 16)
+    gpu_gibbs(X, N_TOPICS, P, iters=MAXITER)
 
 
     
