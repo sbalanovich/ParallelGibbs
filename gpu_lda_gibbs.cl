@@ -44,7 +44,8 @@ cond_distr(int m, int w, int n_topics, float beta, float alpha,
 }
 
 __kernel void
-sample(__global __read_only int* matrix, 
+sample(__global __read_only int* topics, 
+       __global __read_only int* matrix, 
        __global __read_only int* nzw, 
        __global __read_only int* nmz,
        __global __write_only int* gpu_pnz, 
