@@ -1,6 +1,26 @@
+int searchsorted(__global float* arr, int length, float value){
+    /*
+    Bisection search (c.f. numpy.searchsorted)
+    Find the index into sorted array `arr` of length `length` such that, if
+    `value` were inserted before the index, the order of `arr` would be
+    preserved. From https://github.com/ariddell/lda/blob/develop/lda/_lda.pyx
+    */
+    int imin = 0;
+    int imax = length;
+    int imid = 0;
+    while (imin < imax) {
+        imid = imin + ((imax - imin) >> 2);
+        if (value > arr[imid])
+            imin = imid + 1;
+        else
+            imax = imid;
+    }
+    return imin;
+}
 
-int cond_distr(int m, int w, int n_topics, float beta, float alpha, 
-            int* my_nzw, int* nz, int* nmz, int num_words, int n_docs) {
+int cond_distr(int m, int w, int n_topics, float beta, float alpha, float randi,
+            __global int* nzw, __global int* nz, __global int* nmz, __global float* dist_sum, 
+            int n_words, int n_docs) {
         // num_words = num words for this processor
         // n_topics = number of topics in total
 
@@ -24,50 +44,32 @@ int cond_distr(int m, int w, int n_topics, float beta, float alpha,
         // return pnz;
 
 
-        //algorithm for sampling from https://github.com/ariddell/lda/blob/develop/lda/_lda.pyx
-        // float dist_cum = 0;
-        // for (int k =0; k < n_topics; k++) {
-
-        //     dist_cum += (nzw[k * n_topics + w] + beta) / (nz[k] + beta * num_words) * (nmz[m * n_docs + k] + alpha);
-        //     dist_sum[k] = dist_cum;
-        // }
-
-        return 1;//searchsorted(dist_sum, n_topics, rand() * dist_cum);
+        // algorithm for sampling from https://github.com/ariddell/lda/blob/develop/lda/_lda.pyx
+        float dist_cum = 0;
+        // double* dist_sum = (double*) malloc(n_topics * sizeof(double));
+        for (int k =0; k < n_topics; k++) {
+            dist_cum += (nzw[k * n_words + w] + beta) / 
+                        (nz[k] + beta * n_words) * 
+                        (nmz[m * n_topics + k] + alpha);
+            dist_sum[k] = dist_cum;
+        }
+        return searchsorted(dist_sum, n_topics, randi * dist_cum);
         
 }
 
-
-// int searchsorted(double* arr, int length, double value){
-//     """Bisection search (c.f. numpy.searchsorted)
-//     Find the index into sorted array `arr` of length `length` such that, if
-//     `value` were inserted before the index, the order of `arr` would be
-//     preserved. From https://github.com/ariddell/lda/blob/develop/lda/_lda.pyx
-//     """
-//     int imin = 0;
-//     int imax = length;
-//     int imid = 0;
-//     while (imin < imax) {
-//         imid = imin + ((imax - imin) >> 2);
-//         if (value > arr[imid])
-//             imin = imid + 1;
-//         else
-//             imax = imid;
-//     }
-//     return imin;
-// }
-
 __kernel void
-sample(__global __read_only int* topics, 
-       __global __read_only int* matrix, 
-       __global __read_only int* nzw, 
-       __global __read_only int* nmz,
-       __global __read_only int* nz, 
-       __global __read_only int* nm,
-       __global __write_only int* gpu_pnz, 
+sample(__global int* topics, 
+       __global int* matrix, 
+       __global int* nzw, 
+       __global int* nmz,
+       __global int* nz, 
+       __global int* nm,
+       __global int* rands, 
+       __global float* dist_sum, 
        __local int *topic_buffer,
        __local int *nmz_buffer, __local int *nm_buffer,
        __local int *nzw_buffer, __local int *nz_buffer,
-       int p, int n_topics, int n_words, 
+       int n_topics, int n_words, 
        int n_docs, float alpha, float beta)
 {
     // Pull in all the ids
@@ -80,7 +82,7 @@ sample(__global __read_only int* topics,
     global_sz = (global_sz <= 0 ) ? 1 : global_sz;
     int k_words = ceil((float) n_words / global_sz);
     int k_docs = ceil((float) n_docs / global_sz);
-    printf("%d %d %d %d %d\n", local_id, global_id, group_id, k_words, k_docs);
+    // printf("%d %d %d %d %d\n", local_id, global_id, group_id, k_words, k_docs);
 
     // Load the relevant topics to a local buffer
     for (int d = 0; d < k_docs; d++) {
@@ -90,7 +92,6 @@ sample(__global __read_only int* topics,
             topic_buffer[d * k_words + w] = topics[doc * n_words + word];
         }
     }
-
 
     // barrier(CLK_LOCAL_MEM_FENCE);
 
@@ -144,7 +145,10 @@ sample(__global __read_only int* topics,
             // printf("##%d## %d ##%d##", z, m * k_words + w, k_docs * k_words);
             nz_buffer[z] -= 1;
 
-            // // z = cond_distr(inputs);
+            float randi = rands[m * global_id + w * global_id + global_id + local_id];
+            z = cond_distr(m, w, n_topics, beta, alpha, 
+                           randi, nzw, nz, nmz, 
+                           dist_sum, n_words, n_docs);
 
             nmz_buffer[m * n_topics + z] += 1;
             nm_buffer[m] += 1;
