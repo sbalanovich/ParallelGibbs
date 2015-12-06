@@ -51,6 +51,7 @@ class LdaSampler(object):
         self.n_topics = n_topics
         self.alpha = alpha
         self.beta = beta
+        self.sample_times = []
 
     def _initialize(self, matrix):
         n_docs, vocab_size = matrix.shape
@@ -144,6 +145,7 @@ class LdaSampler(object):
             end = time.time()
 
             print 'Sampled in %.3f seconds' % (end-start)
+            self.sample_times.append(end-start)
 
             yield self.phi()
 
