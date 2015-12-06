@@ -32,22 +32,39 @@ def dump_reuters_dataset():
         pickle.dump( (X, vocab, titles), wfile)
 
 
-def serial_gibbs(X, k, iters=50):
+def serial_gibbs(X, k, iters=50, log=True):
     sampler = LdaSampler(k)
     start = time.time()
     for it, phi in enumerate(sampler.run(X, maxiter=iters)):
-        print "Iteration", it
-        print "Likelihood", sampler.loglikelihood()
+        if log:
+            print "Iteration", it
+            print "Likelihood", sampler.loglikelihood()
+        else:
+            i = it
     end = time.time()
     print 'Completed %d iterations in %.3f seconds (serial)' % (iters, end - start)
+    return sampler
 
 
-def multicore_gibbs(X, k, p, iters=50):
+def multicore_gibbs(X, k, p, iters=50, log=True):
     sampler = MulticoreLdaSampler(k, p)
     start = time.time()
     for it, phi in enumerate(sampler.run(X, maxiter=iters)):
+        if log:
+            print "Iteration", it
+            print "Likelihood", sampler.loglikelihood()
+        else:
+            i = it
+    end = time.time()
+    print 'Completed %d iterations in %.3f seconds (P=%d)' % (iters, end - start, p)
+    return sampler
+
+def gpu_gibbs(X, k, p, iters=50):
+    sampler = GPULdaSampler(k, p)
+    start = time.time()
+    for it, phi in enumerate(sampler.run(X, maxiter=iters)):
         print "Iteration", it
-        print "Likelihood", sampler.loglikelihood()
+        # print "Likelihood", sampler.loglikelihood()
     end = time.time()
     print 'Completed %d iterations in %.3f seconds (P=%d)' % (iters, end - start, p)
 
