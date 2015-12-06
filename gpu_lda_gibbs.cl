@@ -51,6 +51,18 @@ sample(__global __read_only int* topics,
         }
     }
 
+    int nz[10];
+    for (int i = 0; i < n_topics; i++)
+    {
+        for (int j = 0; j < n_words; j++) 
+        {
+            if (nz[i])
+                nz[i] += my_nzw[i * n_words + j];
+            else
+                nz[i] = my_nzw[i * n_words + j];
+        }
+    }
+
     size_t local_id = get_local_id(0);
     size_t global_id = get_global_id(0);
     size_t group_id = get_group_id(0);
@@ -71,18 +83,20 @@ sample(__global __read_only int* topics,
     // Be careful that each thread stays in bounds, both relative to
     // size of x (i.e., N), and the range it's assigned to sum.
     for (int m = k_docs * global_id; m < k_docs * (global_id + 1) && m < n_docs; m++) {
-        w_idx = 0;
         for (int w = k_words * global_id; w < k_words * (global_id + 1) && w < n_words; w++) { 
-            // m = i
+            // topics is num docs x num words
+            int z = *(topics + (m * num_docs + w));
+            *(nmz + m) -= 1;
+            *(nm + m) -= 1;
+            my_nzw
             ;; // Do stuff per word slice here
-            w_idx++;
         }
     }
 
     return 1;
     // for m in docs_by_processor[p]:
     //     for i, w in enumerate(word_indices(matrix[m, :])):
-    //         z = topics[(m,i)]
+    //         z = topics[m,i] //num docs x num words
     //         nmz[m,z] -= 1
     //         nm[m] -= 1
     //         local_nzw[p][z,w] -= 1
