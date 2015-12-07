@@ -73,6 +73,7 @@ sample(__global int* topics,
        __local int *topic_buffer,
        __local int *nmz_buffer, __local int *nm_buffer,
        __local int *nzw_buffer, __local int *nz_buffer,
+       __local int* nz_copy_buffer,
        int n_topics, int n_words, 
        int n_docs, float alpha, float beta)
 {
@@ -87,6 +88,12 @@ sample(__global int* topics,
     int k_words = ceil((float) n_words / global_sz);
     int k_docs = ceil((float) n_docs / global_sz);
     // printf("%d %d %d %d %d\n", local_id, global_id, group_id, k_words, k_docs);
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    for (int t = 0; t < n_topics; t++) {
+        nz_copy_buffer[t] = nz[t];
+    }
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
@@ -209,8 +216,7 @@ sample(__global int* topics,
     barrier(CLK_LOCAL_MEM_FENCE);
 
     for (int n = 0; n < nzs_sz; n++) {
-        // printf("##%d %d\n", n, nz_buffer[n]);
-        nz[n] += (nz_buffer[n] - nz[n]);
+        nz[n] += (nz_buffer[n] - nz_copy_buffer[n]);
     }
 
     barrier(CLK_LOCAL_MEM_FENCE);
