@@ -183,7 +183,7 @@ class GPULdaSampler(object):
         n_docs, vocab_size = matrix.shape
         self._initialize(matrix)
         num_workgroups = self.P
-        num_workers = 128
+        num_workers = 1
         startFit = time.time()
         
         ### Sample
@@ -220,17 +220,18 @@ class GPULdaSampler(object):
         n_docs = np.int32(matrix.shape[0])
         n_words = np.int32(matrix.shape[1])
 
-        rands = np.random.rand(n_docs * n_words * maxiter).astype(np.float32)
+        rands = np.random.rand(n_docs * n_words * maxiter / num_workgroups).astype(np.float32)
+        print rands
+        # return
         gpu_rands = cl.Buffer(context, cl.mem_flags.READ_ONLY, rands.size * 4)
         gpu_dist_sum = cl.Buffer(context, cl.mem_flags.READ_ONLY, n_topics * 4)
 
-        print n_docs * n_words
         # Local Memory for Slices
-        topics_local_memory = cl.LocalMemory(4 * n_docs * n_words)
-        nmz_local_memory = cl.LocalMemory(4 * n_docs * n_topics)
-        nm_local_memory = cl.LocalMemory(4 * n_docs)
-        nzw_local_memory = cl.LocalMemory(4 * n_topics * n_words)
-        nz_local_memory = cl.LocalMemory(4 * n_topics)
+        topics_local_memory = cl.LocalMemory(4 * n_docs * n_words / num_workgroups)
+        nmz_local_memory = cl.LocalMemory(4 * n_docs * n_topics / num_workgroups)
+        nm_local_memory = cl.LocalMemory(4 * n_docs / num_workgroups)
+        nzw_local_memory = cl.LocalMemory(4 * n_topics * n_words / num_workgroups)
+        nz_local_memory = cl.LocalMemory(4 * n_topics / num_workgroups)
 
         # Sizing
         global_size, local_size = (num_workgroups * num_workers,), (num_workers,)
@@ -239,20 +240,22 @@ class GPULdaSampler(object):
         gpu_pnz = cl.Buffer(context, cl.mem_flags.WRITE_ONLY, self.topics.size * 4)
         pnz = np.zeros(self.n_topics)
 
-        # Enqueues
-        cl.enqueue_copy(queue, gpu_matrix, flat_matrix, is_blocking=False)
-        cl.enqueue_copy(queue, gpu_topics, flat_topics, is_blocking=False)
-        cl.enqueue_copy(queue, gpu_nzw, flat_nzw, is_blocking=False)
-        cl.enqueue_copy(queue, gpu_nmz, flat_nmz, is_blocking=False)
-        cl.enqueue_copy(queue, gpu_nz, self.nz, is_blocking=False)
-        cl.enqueue_copy(queue, gpu_nm, self.nm, is_blocking=False)
-        cl.enqueue_copy(queue, gpu_rands, rands, is_blocking=False)
-        cl.enqueue_copy(queue, gpu_dist_sum, np.zeros(n_topics).astype(np.float32), is_blocking=False)
         
         for it in xrange(maxiter):
             print self.nz
+            print self.nm
             # For P epochs
             for epoch in range(self.P):
+                # Enqueues
+                cl.enqueue_copy(queue, gpu_matrix, flat_matrix, is_blocking=False)
+                cl.enqueue_copy(queue, gpu_topics, flat_topics, is_blocking=False)
+                cl.enqueue_copy(queue, gpu_nzw, flat_nzw, is_blocking=False)
+                cl.enqueue_copy(queue, gpu_nmz, flat_nmz, is_blocking=False)
+                cl.enqueue_copy(queue, gpu_nz, self.nz, is_blocking=False)
+                cl.enqueue_copy(queue, gpu_nm, self.nm, is_blocking=False)
+                cl.enqueue_copy(queue, gpu_rands, rands, is_blocking=False)
+                cl.enqueue_copy(queue, gpu_dist_sum, np.zeros(n_topics).astype(np.float32), is_blocking=False)
+                
                 event = program.sample(queue, global_size, local_size,
                                         gpu_topics, gpu_matrix, gpu_nzw, gpu_nmz,
                                         gpu_nz, gpu_nm, gpu_rands, gpu_dist_sum,
@@ -267,13 +270,19 @@ class GPULdaSampler(object):
                 cl.enqueue_copy(queue, flat_nmz, gpu_nmz, is_blocking=False)
                 cl.enqueue_copy(queue, self.nz, gpu_nz, is_blocking=False)
                 cl.enqueue_copy(queue, self.nm, gpu_nm, is_blocking=False)
-                # seconds = (event.profile.end - event.profile.start) / 1e9
+
+                seconds = (event.profile.end - event.profile.start) / 1e9
                 # print 'Sampled in %.3f seconds' % seconds
 
                 # Sync
                 start = time.time()
+                matrix = np.reshape(flat_matrix, matrix.shape)
+                self.topics = np.reshape(flat_topics, self.topics.shape)
+                self.nzw = np.reshape(flat_nzw, self.nzw.shape)
+                self.nmz = np.reshape(flat_nmz, self.nmz.shape)
                 self._global_update()
                 end = time.time()
+
                 print 'Updated in %.3f seconds' % (end - start)
                 print "Epoch " + str(epoch) + " finished"
                 print "Likelihood", self.loglikelihood()
