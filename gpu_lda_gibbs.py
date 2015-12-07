@@ -167,7 +167,7 @@ class GPULdaSampler(object):
                 print '---------------------------'
 
         # Create a context with all the devices
-        devices = platforms[0].get_devices()
+        devices = platforms[0].get_devices()[1:]
         context = cl.Context(devices)
         print 'This context is associated with ', len(context.devices), 'devices'
 
@@ -267,8 +267,8 @@ class GPULdaSampler(object):
                 cl.enqueue_copy(queue, flat_nmz, gpu_nmz, is_blocking=False)
                 cl.enqueue_copy(queue, self.nz, gpu_nz, is_blocking=False)
                 cl.enqueue_copy(queue, self.nm, gpu_nm, is_blocking=False)
-                seconds = (event.profile.end - event.profile.start) / 1e9
-                print 'Sampled in %.3f seconds' % seconds
+                # seconds = (event.profile.end - event.profile.start) / 1e9
+                # print 'Sampled in %.3f seconds' % seconds
 
                 # Sync
                 start = time.time()
@@ -276,6 +276,8 @@ class GPULdaSampler(object):
                 end = time.time()
                 print 'Updated in %.3f seconds' % (end - start)
                 print "Epoch " + str(epoch) + " finished"
+                print "Likelihood", self.loglikelihood()
+ 
 
             print "Iteration " + str(it) + " finished" 
             print "Likelihood", self.loglikelihood()

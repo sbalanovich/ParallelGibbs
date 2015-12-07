@@ -73,7 +73,7 @@ def gpu_gibbs(X, k, p, iters=50):
     start = time.time()
     for it, phi in enumerate(sampler.run(X, maxiter=iters)):
         print "Iteration", it
-        # print "Likelihood", sampler.loglikelihood()
+        print "Likelihood", sampler.loglikelihood()
     end = time.time()
     print 'Completed %d iterations in %.3f seconds (P=%d)' % (iters, end - start, p)
 
@@ -82,8 +82,9 @@ if __name__ == '__main__':
     # baseline(X, 10)
     # multicore_gibbs(X, 10, 16)
     import numpy as np
-    # X = np.ones((10, 10)).astype(np.int32)
-    gpu_gibbs(X, N_TOPICS, 2000, iters=MAXITER)
+    X = np.ones((10, 10)).astype(np.int32)
+    # X = X.astype(np.int32)
+    gpu_gibbs(X, N_TOPICS, 5, iters=MAXITER)
 
 
     
