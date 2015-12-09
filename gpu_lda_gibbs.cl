@@ -21,6 +21,7 @@ int searchsorted(__global float* arr, int length, float value){
     return imin;
 }
 
+
 int cond_distr(int m, int w, int n_topics, float beta, float alpha, float randi,
             __local int* nzw, __local int* nz, __local int* nmz, __global float* dist_sum, 
             int n_words, int n_docs) {

@@ -221,7 +221,7 @@ class GPULdaSampler(object):
         n_words = np.int32(matrix.shape[1])
 
         rands = np.random.rand(n_docs * n_words * maxiter / num_workgroups).astype(np.float32)
-        print rands
+        # print rands
         # return
         gpu_rands = cl.Buffer(context, cl.mem_flags.READ_ONLY, rands.size * 4)
         gpu_dist_sum = cl.Buffer(context, cl.mem_flags.READ_ONLY, n_topics * 4)
@@ -271,7 +271,7 @@ class GPULdaSampler(object):
                 cl.enqueue_copy(queue, self.nz, gpu_nz, is_blocking=False)
                 cl.enqueue_copy(queue, self.nm, gpu_nm, is_blocking=False)
 
-                seconds = (event.profile.end - event.profile.start) / 1e9
+                # seconds = (event.profile.end - event.profile.start) / 1e9
                 # print 'Sampled in %.3f seconds' % seconds
 
                 # Sync
@@ -283,9 +283,9 @@ class GPULdaSampler(object):
                 self._global_update()
                 end = time.time()
 
-                print 'Updated in %.3f seconds' % (end - start)
-                print "Epoch " + str(epoch) + " finished"
-                print "Likelihood", self.loglikelihood()
+            #     print 'Updated in %.3f seconds' % (end - start)
+            #     print "Epoch " + str(epoch) + " finished"
+            #     print "Likelihood", self.loglikelihood()
  
 
             print "Iteration " + str(it) + " finished" 
