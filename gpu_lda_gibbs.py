@@ -107,12 +107,12 @@ class GPULdaSampler(object):
             update = sum([self.local_nzw[p][:,w]  - self.nzw[:,w] for p in range(self.P)])
             self.nzw[:,w] = self.nzw[:,w] + update
 
-        for z in xrange(self.n_topics):
-            update = sum([self.local_nz[p][z] - self.nz[z] for p in range(self.P)])
-            self.nz[z] = self.nz[z] + update
+        # for z in xrange(self.n_topics):
+        #     update = sum([self.local_nz[p][z] - self.nz[z] for p in range(self.P)])
+        #     self.nz[z] = self.nz[z] + update
 
         self.local_nzw = [copy(self.nzw) for p in range(self.P)]
-        self.local_nz = [copy(self.nz) for p in range(self.P)]
+        # self.local_nz = [copy(self.nz) for p in range(self.P)]
 
 
     def loglikelihood(self):
@@ -150,32 +150,32 @@ class GPULdaSampler(object):
         ############################ Setup CL
         # List our platforms
         platforms = cl.get_platforms()
-        print 'The platforms detected are:'
-        print '---------------------------'
-        for platform in platforms:
-            print platform.name, platform.vendor, 'version:', platform.version
+        # print 'The platforms detected are:'
+        # print '---------------------------'
+        # for platform in platforms:
+        #     print platform.name, platform.vendor, 'version:', platform.version
 
-        # List devices in each platform
-        for platform in platforms:
-            print 'The devices detected on platform', platform.name, 'are:'
-            print '---------------------------'
-            for device in platform.get_devices():
-                print device.name, '[Type:', cl.device_type.to_string(device.type), ']'
-                print 'Maximum clock Frequency:', device.max_clock_frequency, 'MHz'
-                print 'Maximum allocable memory size:', int(device.max_mem_alloc_size / 1e6), 'MB'
-                print 'Maximum work group size', device.max_work_group_size
-                print '---------------------------'
+        # # List devices in each platform
+        # for platform in platforms:
+        #     print 'The devices detected on platform', platform.name, 'are:'
+        #     print '---------------------------'
+        #     for device in platform.get_devices():
+        #         print device.name, '[Type:', cl.device_type.to_string(device.type), ']'
+        #         print 'Maximum clock Frequency:', device.max_clock_frequency, 'MHz'
+        #         print 'Maximum allocable memory size:', int(device.max_mem_alloc_size / 1e6), 'MB'
+        #         print 'Maximum work group size', device.max_work_group_size
+        #         print '---------------------------'
 
         # Create a context with all the devices
         devices = platforms[0].get_devices()[1:]
         context = cl.Context(devices)
-        print 'This context is associated with ', len(context.devices), 'devices'
+        # print 'This context is associated with ', len(context.devices), 'devices'
 
         # Create a queue for transferring data and launching computations.
         # Turn on profiling to allow us to check event times.
         queue = cl.CommandQueue(context, context.devices[0],
                                 properties=cl.command_queue_properties.PROFILING_ENABLE)
-        print 'The queue is using the device:', queue.device.name
+        # print 'The queue is using the device:', queue.device.name
 
         program = cl.Program(context, open('gpu_lda_gibbs.cl').read()).build(options='')
 
@@ -231,7 +231,8 @@ class GPULdaSampler(object):
         nmz_local_memory = cl.LocalMemory(4 * n_docs * n_topics / num_workgroups)
         nm_local_memory = cl.LocalMemory(4 * n_docs / num_workgroups)
         nzw_local_memory = cl.LocalMemory(4 * n_topics * n_words / num_workgroups)
-        nz_local_memory = cl.LocalMemory(4 * n_topics / num_workgroups)
+        nz_local_memory = cl.LocalMemory(4 * np.int32(n_topics))
+        nz_local_cp = cl.LocalMemory(4 * np.int32(n_topics))
 
         # Sizing
         global_size, local_size = (num_workgroups * num_workers,), (num_workers,)
@@ -239,11 +240,10 @@ class GPULdaSampler(object):
         # Output
         gpu_pnz = cl.Buffer(context, cl.mem_flags.WRITE_ONLY, self.topics.size * 4)
         pnz = np.zeros(self.n_topics)
-
         
         for it in xrange(maxiter):
             print self.nz
-            print self.nm
+            # print self.nm
             # For P epochs
             for epoch in range(self.P):
                 # Enqueues
@@ -261,7 +261,7 @@ class GPULdaSampler(object):
                                         gpu_nz, gpu_nm, gpu_rands, gpu_dist_sum,
                                         topics_local_memory, 
                                         nmz_local_memory, nm_local_memory,
-                                        nzw_local_memory, nz_local_memory,
+                                        nzw_local_memory, nz_local_memory, nz_local_cp,
                                         n_topics, n_words, n_docs, alpha, beta)
 
                 cl.enqueue_copy(queue, flat_matrix, gpu_matrix, is_blocking=False)
@@ -280,7 +280,7 @@ class GPULdaSampler(object):
                 self.topics = np.reshape(flat_topics, self.topics.shape)
                 self.nzw = np.reshape(flat_nzw, self.nzw.shape)
                 self.nmz = np.reshape(flat_nmz, self.nmz.shape)
-                self._global_update()
+                # self._global_update()
                 end = time.time()
 
             #     print 'Updated in %.3f seconds' % (end - start)
@@ -290,6 +290,6 @@ class GPULdaSampler(object):
 
             print "Iteration " + str(it) + " finished" 
             print "Likelihood", self.loglikelihood()
-        endFit = time.time()
-        print 'Fit in %.3f seconds' % (endFit - startFit)
+        # endFit = time.time()
+        # print 'Fit in %.3f seconds' % (endFit - startFit)
         yield 1
