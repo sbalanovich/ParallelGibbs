@@ -11,7 +11,7 @@ from copy import copy
 import ctypes
 from functools import partial
 import numpy as np
-from multiprocessing import Array, Pool
+from multiprocessing import Array, Pool, Process
 import scipy as sp
 from scipy.special import gammaln
 import time
@@ -51,11 +51,11 @@ def make_shared_array(shape, _type=ctypes.c_int):
     shared_array = np.ctypeslib.as_array(shared_array_base)
     shared_array = shared_array.reshape(*shape)
 
-    return Array(_type, shape, lock=False)
+    return shared_array
 
 
 n_topics = 10
-P = 1
+P = 8
 n_docs = 395
 vocab_size = 4258
 
@@ -185,19 +185,17 @@ class MulticoreLdaSampler(object):
         for it in xrange(maxiter):
 
             start = time.time()
-            results = []
+            jobs = []
             for p in range(self.P):
-                args = [matrix[self.docs_by_processor[p]], self.docs_by_processor,
-                self.alpha, self.beta, p]
-                results.append(self.pool.apply_async(sample, args))
+                args = (matrix[self.docs_by_processor[p]], self.docs_by_processor,
+                self.alpha, self.beta, p)
+                jobs.append(Process(target = sample, args = args))
 
-            for p, res in enumerate(results):
-                done = res.get()
-            #     indices = self.docs_by_processor[p]
-            #     local_nz[p], local_nzw[p] = nz, nzw
-            #     nm[indices] = nm
-            #     nmz[indices] = nmz
-            #     topics[indices] = topics
+            for j in jobs:
+                j.start()
+
+            for j in jobs:
+                j.join()
 
             end = time.time()
             self.sample_times.append(end-start)

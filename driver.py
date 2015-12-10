@@ -84,7 +84,7 @@ if __name__ == '__main__':
     # X, vocab, titles = X[0:200,0:4000], vocab[0:4000], titles[0:200]
     # baseline(X, 10)
     # X = np.ones((10, 10)).astype(np.int32)
-    multicore_gibbs(X, 10, 1)
+    multicore_gibbs(X, 10, 8)
     # serial_gibbs(X, 10)
 
     # gpu_gibbs(X, N_TOPICS, 10, iters=50)
