@@ -78,15 +78,20 @@ def gpu_gibbs(X, k, p, iters=50):
     end = time.time()
     print 'Completed %d iterations in %.3f seconds (P=%d)' % (iters, end - start, p)
 
+
+def truncate_data(X, width, height):
+    return np.array([X[height][:width] for row in range(height)])
+
 if __name__ == '__main__':
     X, vocab, titles = load_reuters_dataset()
     print X[0:200,0:4000].shape, len(vocab[0:4000]), len(titles[0:200])
     X, vocab, titles = X[0:200,0:4000], vocab[0:4000], titles[0:200]
     # baseline(X, 10)
     # multicore_gibbs(X, 10, 16)
-    X = np.ones((10, 10)).astype(np.int32)
-
-    gpu_gibbs(X, N_TOPICS, 5, iters=MAXITER)
+    # X = np.ones((10, 10))
+    print X.shape
+    X = X.astype(np.int32)
+    gpu_gibbs(X, N_TOPICS, 100, iters=MAXITER)
 
 
     

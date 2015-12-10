@@ -22,6 +22,10 @@ int searchsorted(__global float* arr, int length, float value){
 }
 
 
+
+
+
+
 int cond_distr(int m, int w, int n_topics, float beta, float alpha, float randi,
             __local int* nzw, __local int* nz, __local int* nmz, __global float* dist_sum, 
             int n_words, int n_docs) {
@@ -116,8 +120,7 @@ sample(__global int* topics,
     barrier(CLK_LOCAL_MEM_FENCE);
 
     // Load the relevant nmzs to a local buffer
-    int nmzs_sz = k_words;
-    for (int n = 0; n < nmzs_sz; n++) {
+    for (int n = 0; n < k_docs; n++) {
         int doc = k_docs * global_id + n;
         for (int topic = 0; topic < n_topics; topic++) {
             nmz_buffer[n * n_topics + topic] = nmz[doc * n_topics + topic];
@@ -232,8 +235,12 @@ sample(__global int* topics,
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
+
+
+
+
     // Load the relevant nmzs to a local buffer
-    for (int n = 0; n < nmzs_sz; n++) {
+    for (int n = 0; n < k_words; n++) {
         int doc = k_docs * global_id + n;
         for (int topic = 0; topic < n_topics; topic++) {
             nmz[doc * n_topics + topic] = nmz_buffer[n * n_topics + topic];

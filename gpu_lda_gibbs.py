@@ -280,14 +280,14 @@ class GPULdaSampler(object):
                 self.topics = np.reshape(flat_topics, self.topics.shape)
                 self.nzw = np.reshape(flat_nzw, self.nzw.shape)
                 self.nmz = np.reshape(flat_nmz, self.nmz.shape)
-                # self._global_update()
+                
                 end = time.time()
 
             #     print 'Updated in %.3f seconds' % (end - start)
             #     print "Epoch " + str(epoch) + " finished"
             #     print "Likelihood", self.loglikelihood()
  
-
+            self._global_update()
             print "Iteration " + str(it) + " finished" 
             print "Likelihood", self.loglikelihood()
         # endFit = time.time()
