@@ -3,7 +3,7 @@ import lda
 import os
 from serial_lda_gibbs import LdaSampler
 from multicore_lda_gibbs import MulticoreLdaSampler
-from gpu_lda_gibbs import GPULdaSampler
+# from gpu_lda_gibbs import GPULdaSampler
 import time
 import numpy as np
 
@@ -80,12 +80,14 @@ def gpu_gibbs(X, k, p, iters=50):
 
 if __name__ == '__main__':
     X, vocab, titles = load_reuters_dataset()
-    print X[0:200,0:4000].shape, len(vocab[0:4000]), len(titles[0:200])
-    X, vocab, titles = X[0:200,0:4000], vocab[0:4000], titles[0:200]
+    # print X[0:200,0:4000].shape, len(vocab[0:4000]), len(titles[0:200])
+    # X, vocab, titles = X[0:200,0:4000], vocab[0:4000], titles[0:200]
     # baseline(X, 10)
-    # multicore_gibbs(X, 10, 16)
-    X = np.ones((10, 10)).astype(np.int32)
-    gpu_gibbs(X, N_TOPICS, 10, iters=50)
+    # X = np.ones((10, 10)).astype(np.int32)
+    multicore_gibbs(X, 10, 1)
+    # serial_gibbs(X, 10)
+
+    # gpu_gibbs(X, N_TOPICS, 10, iters=50)
     # print X.shape
     # gpu_gibbs(X, N_TOPICS, 200, iters=50)
 
