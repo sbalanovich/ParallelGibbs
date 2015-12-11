@@ -91,7 +91,7 @@ def gpu_gibbs(X, k, iters, p):
 
 
 datasets = {
-    'synthetic': lambda : np.ones((200, 400)),
+    'synthetic': lambda : np.ones((200, 400)).astype(np.int32),
     'reuters': lambda: load_reuters_dataset()[0],
     'nytimes': lambda: load_from_file('nytimes'),
 }
