@@ -107,9 +107,9 @@ class GPULdaSampler(object):
             update = sum([self.local_nzw[p][:,w]  - self.nzw[:,w] for p in range(self.P)])
             self.nzw[:,w] = self.nzw[:,w] + update
 
-        # for z in xrange(self.n_topics):
-        #     update = sum([self.local_nz[p][z] - self.nz[z] for p in range(self.P)])
-        #     self.nz[z] = self.nz[z] + update
+        for z in xrange(self.n_topics):
+            update = sum([self.local_nz[p][z] - self.nz[z] for p in range(self.P)])
+            self.nz[z] = self.nz[z] + update
 
         self.local_nzw = [copy(self.nzw) for p in range(self.P)]
         # self.local_nz = [copy(self.nz) for p in range(self.P)]
@@ -220,17 +220,17 @@ class GPULdaSampler(object):
         n_docs = np.int32(matrix.shape[0])
         n_words = np.int32(matrix.shape[1])
 
-        rands = np.random.rand(n_docs * n_words * maxiter / num_workgroups).astype(np.float32)
+        rands = np.random.rand(n_docs * n_words * maxiter).astype(np.float32)
         # print rands
         # return
         gpu_rands = cl.Buffer(context, cl.mem_flags.READ_ONLY, rands.size * 4)
         gpu_dist_sum = cl.Buffer(context, cl.mem_flags.READ_ONLY, n_topics * 4)
 
         # Local Memory for Slices
-        topics_local_memory = cl.LocalMemory(4 * n_docs * n_words / num_workgroups)
+        topics_local_memory = cl.LocalMemory(4 * n_docs * n_words)
         nmz_local_memory = cl.LocalMemory(4 * n_docs * n_topics / num_workgroups)
         nm_local_memory = cl.LocalMemory(4 * n_docs / num_workgroups)
-        nzw_local_memory = cl.LocalMemory(4 * n_topics * n_words / num_workgroups)
+        nzw_local_memory = cl.LocalMemory(4 * n_topics * n_words)
         nz_local_memory = cl.LocalMemory(4 * np.int32(n_topics))
         nz_local_cp = cl.LocalMemory(4 * np.int32(n_topics))
 
@@ -242,19 +242,22 @@ class GPULdaSampler(object):
         pnz = np.zeros(self.n_topics)
         
         for it in xrange(maxiter):
-            print self.nz
+            # print self.nz
             # print self.nm
             # For P epochs
-            for epoch in range(self.P):
+            for epoch in range(1):
                 # Enqueues
-                cl.enqueue_copy(queue, gpu_matrix, flat_matrix, is_blocking=False)
-                cl.enqueue_copy(queue, gpu_topics, flat_topics, is_blocking=False)
-                cl.enqueue_copy(queue, gpu_nzw, flat_nzw, is_blocking=False)
-                cl.enqueue_copy(queue, gpu_nmz, flat_nmz, is_blocking=False)
-                cl.enqueue_copy(queue, gpu_nz, self.nz, is_blocking=False)
-                cl.enqueue_copy(queue, gpu_nm, self.nm, is_blocking=False)
-                cl.enqueue_copy(queue, gpu_rands, rands, is_blocking=False)
-                cl.enqueue_copy(queue, gpu_dist_sum, np.zeros(n_topics).astype(np.float32), is_blocking=False)
+
+                # print self.nz
+
+                cl.enqueue_copy(queue, gpu_matrix, flat_matrix, is_blocking=True)
+                cl.enqueue_copy(queue, gpu_topics, flat_topics, is_blocking=True)
+                cl.enqueue_copy(queue, gpu_nzw, flat_nzw, is_blocking=True)
+                cl.enqueue_copy(queue, gpu_nmz, flat_nmz, is_blocking=True)
+                cl.enqueue_copy(queue, gpu_nz, self.nz, is_blocking=True)
+                cl.enqueue_copy(queue, gpu_nm, self.nm, is_blocking=True)
+                cl.enqueue_copy(queue, gpu_rands, rands, is_blocking=True)
+                cl.enqueue_copy(queue, gpu_dist_sum, np.zeros(n_topics).astype(np.float32), is_blocking=True)
                 
                 event = program.sample(queue, global_size, local_size,
                                         gpu_topics, gpu_matrix, gpu_nzw, gpu_nmz,
@@ -262,15 +265,17 @@ class GPULdaSampler(object):
                                         topics_local_memory, 
                                         nmz_local_memory, nm_local_memory,
                                         nzw_local_memory, nz_local_memory, nz_local_cp,
-                                        n_topics, n_words, n_docs, alpha, beta)
+                                        n_topics, n_words, n_docs, alpha, beta, np.int32(it))
 
-                cl.enqueue_copy(queue, flat_matrix, gpu_matrix, is_blocking=False)
-                cl.enqueue_copy(queue, flat_topics, gpu_topics, is_blocking=False)
-                cl.enqueue_copy(queue, flat_nzw, gpu_nzw, is_blocking=False)
-                cl.enqueue_copy(queue, flat_nmz, gpu_nmz, is_blocking=False)
-                cl.enqueue_copy(queue, self.nz, gpu_nz, is_blocking=False)
-                cl.enqueue_copy(queue, self.nm, gpu_nm, is_blocking=False)
+                cl.enqueue_copy(queue, flat_matrix, gpu_matrix, is_blocking=True)
+                cl.enqueue_copy(queue, flat_topics, gpu_topics, is_blocking=True)
+                cl.enqueue_copy(queue, flat_nzw, gpu_nzw, is_blocking=True)
+                cl.enqueue_copy(queue, flat_nmz, gpu_nmz, is_blocking=True)
+                cl.enqueue_copy(queue, self.nz, gpu_nz, is_blocking=True)
+                cl.enqueue_copy(queue, self.nm, gpu_nm, is_blocking=True)
 
+                print self.nz
+                print
                 # seconds = (event.profile.end - event.profile.start) / 1e9
                 # print 'Sampled in %.3f seconds' % seconds
 
@@ -287,9 +292,9 @@ class GPULdaSampler(object):
             #     print "Epoch " + str(epoch) + " finished"
             #     print "Likelihood", self.loglikelihood()
  
-            self._global_update()
-            print "Iteration " + str(it) + " finished" 
-            print "Likelihood", self.loglikelihood()
+                # self._global_update()
+                print "Iteration " + str(it) + " finished" 
+                print "Likelihood", self.loglikelihood()
         # endFit = time.time()
         # print 'Fit in %.3f seconds' % (endFit - startFit)
         yield 1
