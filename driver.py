@@ -124,9 +124,15 @@ def main(dataset, method, n_topics, p, iterations):
         args += (P,)
     sampler(*args)
 
+def test():
+    X = (np.random.rand(500, 100) * 10).astype(np.int32)
+    # X, vocab, titles = load_reuters_dataset()
+    sampler = gpu_gibbs
+    args = (X, 10, 50, 10)
+    sampler(*args)
 
 if __name__ == '__main__':
-    main()
+    test()
     # main('reuters', 'multiprocessing', 10, 8, 2)
     # X, vocab, titles = load_reuters_dataset()
     # print X[0:200,0:4000].shape, len(vocab[0:4000]), len(titles[0:200])

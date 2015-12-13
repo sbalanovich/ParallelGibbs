@@ -83,7 +83,9 @@ class GPULdaSampler(object):
         self.nzw = np.zeros((self.n_topics, vocab_size)).astype(np.int32)
         self.nm = np.zeros(n_docs).astype(np.int32)
         self.nz = np.zeros(self.n_topics).astype(np.int32)
-        self.topics = np.zeros((n_docs, vocab_size)).astype(np.int32)
+
+        self.max_doc_length = max(map(sum, matrix))
+        self.topics = np.zeros((n_docs,  self.max_doc_length)).astype(np.int32)
 
         for m in xrange(n_docs):
             # i is a number between 0 and doc_length-1
@@ -220,14 +222,12 @@ class GPULdaSampler(object):
         n_docs = np.int32(matrix.shape[0])
         n_words = np.int32(matrix.shape[1])
 
-        rands = np.random.rand(n_docs * n_words * maxiter).astype(np.float32)
         # print rands
         # return
-        gpu_rands = cl.Buffer(context, cl.mem_flags.READ_ONLY, rands.size * 4)
+        gpu_rands = cl.Buffer(context, cl.mem_flags.READ_ONLY, n_docs * n_words * 4)
         gpu_dist_sum = cl.Buffer(context, cl.mem_flags.READ_ONLY, n_topics * 4)
 
         # Local Memory for Slices
-        topics_local_memory = cl.LocalMemory(4 * n_docs * n_words)
         nmz_local_memory = cl.LocalMemory(4 * n_docs * n_topics / num_workgroups)
         nm_local_memory = cl.LocalMemory(4 * n_docs / num_workgroups)
         nzw_local_memory = cl.LocalMemory(4 * n_topics * n_words)
@@ -250,6 +250,9 @@ class GPULdaSampler(object):
 
                 # print self.nz
 
+                rands = np.random.rand(n_docs * n_words).astype(np.float32)
+
+
                 cl.enqueue_copy(queue, gpu_matrix, flat_matrix, is_blocking=True)
                 cl.enqueue_copy(queue, gpu_topics, flat_topics, is_blocking=True)
                 cl.enqueue_copy(queue, gpu_nzw, flat_nzw, is_blocking=True)
@@ -262,9 +265,9 @@ class GPULdaSampler(object):
                 event = program.sample(queue, global_size, local_size,
                                         gpu_topics, gpu_matrix, gpu_nzw, gpu_nmz,
                                         gpu_nz, gpu_nm, gpu_rands, gpu_dist_sum,
-                                        topics_local_memory, 
                                         nmz_local_memory, nm_local_memory,
                                         nzw_local_memory, nz_local_memory, nz_local_cp,
+                                        self.max_doc_length,
                                         n_topics, n_words, n_docs, alpha, beta, np.int32(it))
 
                 cl.enqueue_copy(queue, flat_matrix, gpu_matrix, is_blocking=True)

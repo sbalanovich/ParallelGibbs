@@ -57,9 +57,10 @@ int cond_distr(int m, int w, int n_topics, float beta, float alpha, float randi,
                         (nmz[m * n_topics + k] + alpha);
             dist_sum[k] = dist_cum;
         }
-        
-        // return searchsorted(dist_sum, n_topics, randi * dist_cum);
-        return (int) (randi * n_topics);
+        int z = searchsorted(dist_sum, n_topics-1, randi * dist_cum);
+        if (z > 9 || z < 0) printf("%d\n", z);
+        return z;
+        // return (int) (randi * n_topics);
 
 }
 
@@ -74,11 +75,10 @@ sample(__global int* topics,
        __global int* nm,
        __global float* rands, 
        __global float* dist_sum, 
-       __local int *topic_buffer,
        __local int *nmz_buffer, __local int *nm_buffer,
        __local int *nzw_buffer, __local int *nz_buffer,
        __local int* nz_copy_buffer,
-       int n_topics, int n_words, 
+       int max_doc_length, int n_topics, int n_words, 
        int n_docs, float alpha, float beta, int current_iteration)
 {
     // Pull in all the ids
@@ -103,20 +103,20 @@ sample(__global int* topics,
     barrier(CLK_LOCAL_MEM_FENCE);
 
     // Load the relevant topics to a local buffer
-    for (int d = 0; d < k_docs; d++) {
-        int doc = k_docs * global_id + d;
-        for (int w = 0; w < k_words; w++) {
-            int word = w;
-            // printf("i: %d, t: %d\n", doc * n_words + word, topics[doc * n_words + word]);
-            topic_buffer[d * k_words + w] = topics[doc * n_words + word];
-            if ((d * k_words + w) > (k_docs * k_words)){
-                printf("Fail1\n");
-            }
-            if ((doc * n_words + word) > (n_docs * n_words)){
-                printf("Fail2\n");
-            }
-        }
-    }
+    // for (int d = 0; d < k_docs; d++) {
+    //     int doc = k_docs * global_id + d;
+    //     for (int w = 0; w < k_words; w++) {
+    //         int word = w;
+    //         // printf("i: %d, t: %d\n", doc * n_words + word, topics[doc * n_words + word]);
+    //         topic_buffer[d * k_words + w] = topics[doc * n_words + word];
+    //         if ((d * k_words + w) > (k_docs * k_words)){
+    //             printf("Fail1\n");
+    //         }
+    //         if ((doc * n_words + word) > (n_docs * n_words)){
+    //             printf("Fail2\n");
+    //         }
+    //     }
+    // }
 
 
 
@@ -131,9 +131,9 @@ sample(__global int* topics,
             if ((n * n_topics + topic) > (k_docs * n_topics)){
                 printf("Fail3\n");
             }
-            if ((doc * n_topics + topic) > (n_docs * n_topics)){
-                printf("Fail4\n");
-            }
+            // if ((doc * n_topics + topic) > (n_docs * n_topics)){
+            //     printf("Fail4\n");
+            // }
         }
     }
 
@@ -147,10 +147,12 @@ sample(__global int* topics,
         if ((n) > (k_docs)){
             printf("Fail5\n");
         }
-        if ((doc) > (n_docs)){
-            printf("Fail6\n");
-        }
+        // if ((doc) > (n_docs)){
+        //     printf("Fail6\n");
+        // }
     }
+
+
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
@@ -183,41 +185,53 @@ sample(__global int* topics,
 
 
 
+
+
+
+
     barrier(CLK_LOCAL_MEM_FENCE);
 
     for (int m = 0; m < k_docs; m++)
     {
-        for (int w = 0; w < k_words; w++)
+        int doc = k_docs * global_id + m;
+        for (int w = 0; w < n_words; w++)
+        // for (int i = 0; i < max_doc_length; i++)
         {
-            int z = topic_buffer[m * k_words + w];
+            
+            int occurences = matrix[doc * n_words + w];
 
-            // printf("i: %d, t: %d\n", m * k_words + w, topic_buffer[m * k_words + w]);
+            for (int i = 0; i < occurences; i++){
 
+                int z = topics[doc * max_doc_length + i];
 
-            // printf("# %d\n", z);
-            nmz_buffer[m * n_topics + z] -= 1;
-            nm_buffer[m] -= 1;
-            nzw_buffer[z * k_words + w] -= 1;
-            nz_buffer[z] -= 1;
-            // printf("#%d %d %d %d %d#\n", 
-            //     z, nmz_buffer[m * n_topics + z], nm_buffer[m],
-            //     nzw_buffer[z * k_words + w], nz_buffer[z]);
+                // printf("i: %d, t: %d\n", m * k_words + w, topic_buffer[m * k_words + w]);
+                nmz_buffer[m * n_topics + z] -= 1;
+                nm_buffer[m] -= 1;
+                nzw_buffer[z * k_words + w] -= 1;
+                nz_buffer[z] -= 1;
+                // printf("#%d %d %d %d %d#\n", 
+                //     z, nmz_buffer[m * n_topics + z], nm_buffer[m],
+                //     nzw_buffer[z * k_words + w], nz_buffer[z]);
 
-            float randi = rands[(global_id + 1) * (current_iteration * (m * k_words + w))];
-            // printf("#######%f\n", randi);
-            z = cond_distr(m, w, n_topics, beta, alpha, 
-                           randi, nzw_buffer, nz_buffer, nmz_buffer, 
-                           dist_sum, k_words, k_docs);
-            // z = 3;
-            // printf("%d\n", z);
+                float randi = rands[m * k_words + w];
+                // printf("#######%f\n", randi);
+                z = cond_distr(m, w, n_topics, beta, alpha, 
+                               randi, nzw_buffer, nz_buffer, nmz_buffer, 
+                               dist_sum, k_words, k_docs);
 
-            nmz_buffer[m * n_topics + z] += 1;
-            nm_buffer[m] += 1;
-            nzw_buffer[z * k_words + w] += 1;
-            nz_buffer[z] += 1;
-            topic_buffer[m * k_words + w] = z;
+                nmz_buffer[m * n_topics + z] += 1;
+                nm_buffer[m] += 1;
+                nzw_buffer[z * k_words + w] += 1;
+                nz_buffer[z] += 1;
+                topics[doc * max_doc_length + i] = z;
+
+            }            
         }
     }
+
+
+
+
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
@@ -239,15 +253,15 @@ sample(__global int* topics,
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
-    for (int d = 0; d < k_docs; d++) {
-        int doc = k_docs * global_id + d;
-        for (int w = 0; w < k_words; w++) {
-            int word = w;
-            topics[doc * n_words + word] = topic_buffer[d * k_words + w];
-        }
-    }
+    // for (int d = 0; d < k_docs; d++) {
+    //     int doc = k_docs * global_id + d;
+    //     for (int w = 0; w < k_words; w++) {
+    //         int word = w;
+    //         topics[doc * n_words + word] = topic_buffer[d * k_words + w];
+    //     }
+    // }
 
-    barrier(CLK_LOCAL_MEM_FENCE);
+    // barrier(CLK_LOCAL_MEM_FENCE);
 
 
 

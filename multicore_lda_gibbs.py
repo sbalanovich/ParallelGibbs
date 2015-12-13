@@ -82,7 +82,8 @@ class MulticoreLdaSampler(object):
         self.nzw = np.zeros((self.n_topics, vocab_size))
         self.nm = np.zeros(n_docs)
         self.nz = np.zeros(self.n_topics)
-        self.topics = np.zeros((n_docs, vocab_size))
+        self.max_doc_length = max(map(sum, matrix))
+        self.topics = np.zeros((n_docs,  self.max_doc_length)).astype(np.int32)
 
         for m in xrange(n_docs):
             # i is a number between 0 and doc_length-1
