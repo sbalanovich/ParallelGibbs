@@ -147,9 +147,9 @@ sample(__global int* topics,
         if ((n) > (k_docs)){
             printf("Fail5\n");
         }
-        // if ((doc) > (n_docs)){
-        //     printf("Fail6\n");
-        // }
+        if ((doc) > (n_docs)){
+            printf("Fail6\n");
+        }
     }
 
 
@@ -157,9 +157,8 @@ sample(__global int* topics,
     barrier(CLK_LOCAL_MEM_FENCE);
 
     // Load the relevant nzws to a local buffer
-    int nzws_sz = k_words;
     for (int topic = 0; topic < n_topics; topic++) {
-        for (int n = 0; n < nzws_sz; n++) {
+        for (int n = 0; n < k_words; n++) {
             int word = n;
             nzw_buffer[topic * k_words + n] = nzw[topic * n_words + word];
             if ((topic * k_words + n) > (k_words * n_topics)){
@@ -171,23 +170,17 @@ sample(__global int* topics,
         }
     }
 
+
+
     barrier(CLK_LOCAL_MEM_FENCE);
 
     // Load the relevant nzs to a local buffer
-    int nzs_sz = n_topics;
-    for (int n = 0; n < nzs_sz; n++) {
+    for (int n = 0; n < n_topics; n++) {
         nz_buffer[n] = nz[n];
         if ((n) > (n_topics)){
             printf("Fail9\n");
         }
     }
-
-
-
-
-
-
-
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
@@ -230,13 +223,10 @@ sample(__global int* topics,
     }
 
 
-
-
-
     barrier(CLK_LOCAL_MEM_FENCE);
 
     for (int topic = 0; topic < n_topics; topic++) {
-        for (int n = 0; n < nzws_sz; n++) {
+        for (int n = 0; n < k_words; n++) {
             int word = n;
             // printf("##%d %d\n", n, nz_buffer[n]);
             nzw[topic * n_words + word] += (nzw_buffer[topic * k_words + n] - nzw[topic * n_words + word]);
@@ -245,7 +235,7 @@ sample(__global int* topics,
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
-    for (int n = 0; n < nzs_sz; n++) {
+    for (int n = 0; n < n_topics; n++) {
         nz[n] += (nz_buffer[n] - nz_copy_buffer[n]);
         // printf("%d, ", nz_buffer[n] - nz_copy_buffer[n]);
     }
@@ -265,8 +255,11 @@ sample(__global int* topics,
 
 
 
+
+
+
     // Load the relevant nmzs to a local buffer
-    for (int n = 0; n < k_words; n++) {
+    for (int n = 0; n < k_docs; n++) {
         int doc = k_docs * global_id + n;
         for (int topic = 0; topic < n_topics; topic++) {
             nmz[doc * n_topics + topic] = nmz_buffer[n * n_topics + topic];

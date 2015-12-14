@@ -125,6 +125,7 @@ class GPULdaSampler(object):
         n_docs = self.nmz.shape[0]
         lik = 0
 
+
         for z in xrange(self.n_topics):
             lik += log_multi_beta(self.nzw[z,:]+self.beta)
             lik -= log_multi_beta(self.beta, vocab_size)
@@ -248,7 +249,7 @@ class GPULdaSampler(object):
             for epoch in range(1):
                 # Enqueues
 
-                # print self.nz
+                print self.nzw
 
                 rands = np.random.rand(n_docs * n_words).astype(np.float32)
 
@@ -277,7 +278,7 @@ class GPULdaSampler(object):
                 cl.enqueue_copy(queue, self.nz, gpu_nz, is_blocking=True)
                 cl.enqueue_copy(queue, self.nm, gpu_nm, is_blocking=True)
 
-                print self.nz
+                # print self.nmz
                 print
                 # seconds = (event.profile.end - event.profile.start) / 1e9
                 # print 'Sampled in %.3f seconds' % seconds

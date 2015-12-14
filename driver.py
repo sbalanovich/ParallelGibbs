@@ -125,10 +125,12 @@ def main(dataset, method, n_topics, p, iterations):
     sampler(*args)
 
 def test():
-    X = (np.random.rand(500, 100) * 10).astype(np.int32)
-    # X, vocab, titles = load_reuters_dataset()
+    # X = (np.random.rand(500, 100) * 10).astype(np.int32)
+    X, vocab, titles = load_reuters_dataset()
+    X, vocab, titles = X[0:10,0:800], vocab[0:4000], titles[0:200]
+
     sampler = gpu_gibbs
-    args = (X, 10, 50, 10)
+    args = (X, 10, 200, 5)
     sampler(*args)
 
 if __name__ == '__main__':
