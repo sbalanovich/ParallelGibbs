@@ -58,7 +58,7 @@ int cond_distr(int m, int w, int n_topics, float beta, float alpha, float randi,
             dist_sum[k] = dist_cum;
         }
         int z = searchsorted(dist_sum, n_topics-1, randi * dist_cum);
-        if (z > 9 || z < 0) printf("%d\n", z);
+        if (z > (n_topics-1) || z < 0) printf("%d\n", z);
         return z;
         // return (int) (randi * n_topics);
 
@@ -161,6 +161,8 @@ sample(__global int* topics,
         for (int n = 0; n < k_words; n++) {
             int word = n;
             nzw_buffer[topic * k_words + n] = nzw[topic * n_words + word];
+
+            printf("%d, ", nzw_buffer[topic * k_words + n]);
             if ((topic * k_words + n) > (k_words * n_topics)){
                 printf("Fail7\n");
             }
@@ -168,7 +170,9 @@ sample(__global int* topics,
                 printf("Fail8\n");
             }
         }
+        printf("\n");
     }
+
 
 
 
@@ -225,13 +229,16 @@ sample(__global int* topics,
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
+    printf("\n");
     for (int topic = 0; topic < n_topics; topic++) {
         for (int n = 0; n < k_words; n++) {
             int word = n;
-            // printf("##%d %d\n", n, nz_buffer[n]);
+            printf("%d, ",  nzw_buffer[topic * k_words + n]);
             nzw[topic * n_words + word] += (nzw_buffer[topic * k_words + n] - nzw[topic * n_words + word]);
         }
+        printf("\n");
     }
+    
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
