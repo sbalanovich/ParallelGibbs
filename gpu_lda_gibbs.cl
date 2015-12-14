@@ -152,8 +152,6 @@ sample(__global int* topics,
         }
     }
 
-
-
     barrier(CLK_LOCAL_MEM_FENCE);
 
     // Load the relevant nzws to a local buffer
@@ -162,7 +160,7 @@ sample(__global int* topics,
             int word = n;
             nzw_buffer[topic * k_words + n] = nzw[topic * n_words + word];
 
-            printf("%d, ", nzw_buffer[topic * k_words + n]);
+            // printf("%d, ", nzw_buffer[topic * k_words + n]);
             if ((topic * k_words + n) > (k_words * n_topics)){
                 printf("Fail7\n");
             }
@@ -170,7 +168,6 @@ sample(__global int* topics,
                 printf("Fail8\n");
             }
         }
-        printf("\n");
     }
 
 
@@ -188,18 +185,21 @@ sample(__global int* topics,
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
+
+
+
     for (int m = 0; m < k_docs; m++)
     {
         int doc = k_docs * global_id + m;
+        int cursor = 0;
         for (int w = 0; w < n_words; w++)
         // for (int i = 0; i < max_doc_length; i++)
         {
             
             int occurences = matrix[doc * n_words + w];
-
             for (int i = 0; i < occurences; i++){
 
-                int z = topics[doc * max_doc_length + i];
+                int z = topics[doc * max_doc_length + cursor];
 
                 // printf("i: %d, t: %d\n", m * k_words + w, topic_buffer[m * k_words + w]);
                 nmz_buffer[m * n_topics + z] -= 1;
@@ -220,7 +220,8 @@ sample(__global int* topics,
                 nm_buffer[m] += 1;
                 nzw_buffer[z * k_words + w] += 1;
                 nz_buffer[z] += 1;
-                topics[doc * max_doc_length + i] = z;
+                topics[doc * max_doc_length + cursor] = z;
+                cursor ++;
 
             }            
         }
@@ -229,14 +230,12 @@ sample(__global int* topics,
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
-    printf("\n");
     for (int topic = 0; topic < n_topics; topic++) {
         for (int n = 0; n < k_words; n++) {
             int word = n;
-            printf("%d, ",  nzw_buffer[topic * k_words + n]);
+            // printf("%d, ",  nzw_buffer[topic * k_words + n]);
             nzw[topic * n_words + word] += (nzw_buffer[topic * k_words + n] - nzw[topic * n_words + word]);
         }
-        printf("\n");
     }
     
 
@@ -259,10 +258,6 @@ sample(__global int* topics,
     // }
 
     // barrier(CLK_LOCAL_MEM_FENCE);
-
-
-
-
 
 
     // Load the relevant nmzs to a local buffer
