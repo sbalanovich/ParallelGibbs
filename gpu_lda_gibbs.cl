@@ -94,13 +94,13 @@ sample(__global int* topics,
     int k_docs = ceil((float) n_docs / global_sz);
     // printf("%d %d %d %d %d\n", local_id, global_id, group_id, k_words, k_docs);
 
-    barrier(CLK_LOCAL_MEM_FENCE);
+    // barrier(CLK_LOCAL_MEM_FENCE);
 
     for (int t = 0; t < n_topics; t++) {
         nz_copy_buffer[t] = nz[t];
     }
 
-    barrier(CLK_LOCAL_MEM_FENCE);
+    // barrier(CLK_LOCAL_MEM_FENCE);
 
     // Load the relevant topics to a local buffer
     // for (int d = 0; d < k_docs; d++) {
@@ -121,7 +121,7 @@ sample(__global int* topics,
 
 
 
-    barrier(CLK_LOCAL_MEM_FENCE);
+    // barrier(CLK_LOCAL_MEM_FENCE);
 
     // Load the relevant nmzs to a local buffer
     for (int n = 0; n < k_docs; n++) {
@@ -137,7 +137,7 @@ sample(__global int* topics,
         }
     }
 
-    barrier(CLK_LOCAL_MEM_FENCE);
+    // barrier(CLK_LOCAL_MEM_FENCE);
 
     // Load the relevant nms to a local buffer
     int nms_sz = k_docs;
@@ -152,7 +152,7 @@ sample(__global int* topics,
         }
     }
 
-    barrier(CLK_LOCAL_MEM_FENCE);
+    // barrier(CLK_LOCAL_MEM_FENCE);
 
     // Load the relevant nzws to a local buffer
     for (int topic = 0; topic < n_topics; topic++) {
@@ -173,7 +173,7 @@ sample(__global int* topics,
 
 
 
-    barrier(CLK_LOCAL_MEM_FENCE);
+    // barrier(CLK_LOCAL_MEM_FENCE);
 
     // Load the relevant nzs to a local buffer
     for (int n = 0; n < n_topics; n++) {
@@ -183,7 +183,7 @@ sample(__global int* topics,
         }
     }
 
-    barrier(CLK_LOCAL_MEM_FENCE);
+    // barrier(CLK_LOCAL_MEM_FENCE);
 
 
 
@@ -227,8 +227,7 @@ sample(__global int* topics,
         }
     }
 
-
-    barrier(CLK_LOCAL_MEM_FENCE);
+    // barrier(CLK_LOCAL_MEM_FENCE);
 
     for (int topic = 0; topic < n_topics; topic++) {
         for (int n = 0; n < k_words; n++) {
@@ -239,7 +238,7 @@ sample(__global int* topics,
     }
     
 
-    barrier(CLK_LOCAL_MEM_FENCE);
+    // barrier(CLK_LOCAL_MEM_FENCE);
 
     for (int n = 0; n < n_topics; n++) {
         nz[n] += (nz_buffer[n] - nz_copy_buffer[n]);
@@ -247,7 +246,7 @@ sample(__global int* topics,
     }
     // printf("\n");
 
-    barrier(CLK_LOCAL_MEM_FENCE);
+    // barrier(CLK_LOCAL_MEM_FENCE);
 
     // for (int d = 0; d < k_docs; d++) {
     //     int doc = k_docs * global_id + d;
@@ -268,7 +267,7 @@ sample(__global int* topics,
         }
     }
 
-    barrier(CLK_LOCAL_MEM_FENCE);
+    // barrier(CLK_LOCAL_MEM_FENCE);
 
     // Load the relevant nms to a local buffer
     for (int n = 0; n < nms_sz; n++) {
@@ -277,6 +276,10 @@ sample(__global int* topics,
     }
 
     barrier(CLK_LOCAL_MEM_FENCE);
+
+
+
+
 
 
 
