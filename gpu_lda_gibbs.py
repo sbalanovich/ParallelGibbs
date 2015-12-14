@@ -249,9 +249,6 @@ class GPULdaSampler(object):
             for epoch in range(1):
                 # Enqueues
 
-                print self.nz
-
-
                 rands = np.random.rand(n_docs * n_words).astype(np.float32)
 
 

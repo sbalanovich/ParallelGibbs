@@ -63,7 +63,7 @@ def serial_gibbs(X, k, iters=50, log=True):
             i = it
     end = time.time()
     print 'Completed %d iterations in %.3f seconds (serial)' % (iters, end - start)
-    return sampler
+    return end - start
 
 
 def multicore_gibbs(X, k, iters, p, log=True):
@@ -77,7 +77,7 @@ def multicore_gibbs(X, k, iters, p, log=True):
             i = it
     end = time.time()
     print 'Completed %d iterations in %.3f seconds (P=%d)' % (iters, end - start, p)
-    return sampler
+    return (end - start)
 
 
 def gpu_gibbs(X, k, iters, p):
@@ -88,6 +88,7 @@ def gpu_gibbs(X, k, iters, p):
         print "Likelihood", sampler.loglikelihood()
     end = time.time()
     print 'Completed %d iterations in %.3f seconds (P=%d)' % (iters, end - start, p)
+    return (end - start)
 
 
 datasets = {
@@ -125,13 +126,37 @@ def main(dataset, method, n_topics, p, iterations):
     sampler(*args)
 
 def test():
-    X = (np.random.rand(40, 100) * 10).astype(np.int32)
+    X = (np.random.rand(60, 100) * 10).astype(np.int32)
+    # X, vocab, titles = load_reuters_dataset()
+    # X, vocab, titles = X[0:10,0:800], vocab[0:4000], titles[0:200]
+    sampler = gpu_gibbs
+    args = (X, 100, 100, 60)
+    return sampler(*args)
+
+
+def test():
+    X = (np.random.rand(60, 100) * 10).astype(np.int32)
     # X, vocab, titles = load_reuters_dataset()
     # X, vocab, titles = X[0:10,0:800], vocab[0:4000], titles[0:200]
 
-    sampler = gpu_gibbs
-    args = (X, 10, 100, 10)
-    sampler(*args)
+    results = {}
+
+    for label, sampler in [('GPU', gpu_gibbs), ('Multicore', multicore_gibbs)]:
+        for P in [1, 2, 5, 10, 20, 30]:
+            args = (X, 10, 100, P)
+            results['%s (P = %d)' % (label, P)] = sampler(*args)
+
+    sampler = serial_gibbs
+    args = (X, 10, 100)
+    serial_time =  sampler(*args)
+
+    results['Serial'] = serial_time
+
+
+
+
+    print str(results)
+
 
 if __name__ == '__main__':
     test()

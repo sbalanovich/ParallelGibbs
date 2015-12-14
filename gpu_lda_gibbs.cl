@@ -152,6 +152,10 @@ sample(__global int* topics,
         }
     }
 
+
+
+
+
     // barrier(CLK_LOCAL_MEM_FENCE);
 
     // Load the relevant nzws to a local buffer
@@ -170,9 +174,6 @@ sample(__global int* topics,
         }
     }
 
-
-
-
     // barrier(CLK_LOCAL_MEM_FENCE);
 
     // Load the relevant nzs to a local buffer
@@ -182,11 +183,6 @@ sample(__global int* topics,
             printf("Fail9\n");
         }
     }
-
-    // barrier(CLK_LOCAL_MEM_FENCE);
-
-
-
 
     for (int m = 0; m < k_docs; m++)
     {
@@ -200,6 +196,9 @@ sample(__global int* topics,
             for (int i = 0; i < occurences; i++){
 
                 int z = topics[doc * max_doc_length + cursor];
+
+                // if (global_id == 18)
+                // printf("%d\n", doc * max_doc_length + cursor);
 
                 // printf("i: %d, t: %d\n", m * k_words + w, topic_buffer[m * k_words + w]);
                 nmz_buffer[m * n_topics + z] -= 1;
