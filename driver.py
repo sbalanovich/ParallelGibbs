@@ -116,14 +116,20 @@ method_options = ', '.join(methods.keys())
     help='Number of processes (ignored for serial version)')
 @click.option('--iterations', default=10, prompt='Number of iterations to run sampler for. Defaut is',
     help='Number of iterations to run sampler for')
-def main(dataset, method, n_topics, p, iterations):
-    print 'Running the %s sampler on %s for %d iterations...' % (method, dataset, iterations)
-    X = datasets[dataset]()
-    sampler = methods[method]
-    args = (X, n_topics, iterations, )
-    if method != 'serial':
-        args += (P,)
-    sampler(*args)
+@click.option('--testMode', default=0, prompt='Set this flag to 1 if you would like to run in test mode',
+    help='Test mode for the driver')
+def main(dataset, method, n_topics, p, iterations, testmode):
+    if testmode != 0:
+        print 'Running the test module'
+        test()
+    else:
+        print 'Running the %s sampler on %s for %d iterations...' % (method, dataset, iterations)
+        X = datasets[dataset]()
+        sampler = methods[method]
+        args = (X, n_topics, iterations, )
+        if method != 'serial':
+            args += (P,)
+        sampler(*args)
 
 def test():
     X = (np.random.rand(60, 100) * 10).astype(np.int32)
@@ -159,7 +165,7 @@ def test():
 
 
 if __name__ == '__main__':
-    test()
+    main()
     # main('reuters', 'multiprocessing', 10, 8, 2)
     # X, vocab, titles = load_reuters_dataset()
     # print X[0:200,0:4000].shape, len(vocab[0:4000]), len(titles[0:200])
