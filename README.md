@@ -17,6 +17,8 @@ pip install -r requirements.txt
 
 Once you have the dependencies, you run the project using a command line interface by running `python driver.py`.
 
+If you would like to run the entire test suite that will run the serial, multicore, and GPU implementations and print the runtime of each one given their configuration, simply run the driver with any options and set the '--test' flag to '1'
+
 ```
 Options:
   --dataset TEXT        Dataset to run sampler on. Options include synthetic,
@@ -27,4 +29,5 @@ Options:
   --P INTEGER           Number of processes (ignored for serial version)
   --iterations INTEGER  Number of iterations to run sampler for
   --help                Show this message and exit.
+  --test				Set this flag to 1 to run full test suite
 ```
